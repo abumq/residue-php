@@ -18,22 +18,27 @@ class InternalLogger
 {
     public static $verbose_level = 9;
 
-    public static function err($msg)
-    {
-        echo "ERR: $msg\n";
-    }
-
     public static function verbose($msg, $level)
     {
-        if ($level <= \residue_internal\InternalLogger::$verbose_level) {
+        if ($level <= InternalLogger::$verbose_level) {
             echo $msg;
             echo "\n";
         }
     }
 
+    public static function err($msg)
+    {
+        InternalLogger::verbose($msg, 1);
+    }
+
     public static function trace($msg)
     {
-        \residue_internal\InternalLogger::verbose($msg, 9);
+        InternalLogger::verbose("trace: " . $msg, 6);
+    }
+
+    public static function info($msg)
+    {
+        InternalLogger::verbose($msg, 2);
     }
 }
 
@@ -361,15 +366,22 @@ class Residue
     {
         \residue_internal\InternalLogger::trace("write_log()");
         if (!$this->connected) {
+            \residue_internal\InternalLogger::info("no connection");
             $this->connect();
+        }
+        if (!$this->validate_connection()) {
+            \residue_internal\InternalLogger::info("connection expired");
+            $this->touch();
         }
         if (array_key_exists($logger_id, $this->tokens)) {
             if (!$this->validate_token($this->tokens[$logger_id])) {
+                \residue_internal\InternalLogger::info("token expired (memory)");
                 $this->obtain_token($logger_id, $this->read_access_code($logger_id));
             }
         } else {
             $this->update_token($logger_id);
             if (!$this->validate_token($this->tokens[$logger_id])) {
+                \residue_internal\InternalLogger::info("token expired");
                 $this->obtain_token($logger_id, $this->read_access_code($logger_id));
             }
         }
