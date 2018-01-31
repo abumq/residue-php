@@ -1,5 +1,5 @@
 {
-    "url": "localhost:8777",
+    "url": "residue-server:8777",
     "access_codes": [
         {
             "logger_id": "sample-app",
@@ -13,5 +13,8 @@
     "dispatch_delay": 1,
     "main_thread_id": "Main Thread",
     "client_id": "muflihun00102030",
-    "client_private_key": "keys/muflihun00102030.pem"
+    "client_private_key": "keys/muflihun00102030.pem",
+    "ripe_bin": "ripe",
+    "nc_bin": "nc",
+    "session_dir": "/tmp/resphp/"
 }
