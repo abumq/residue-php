@@ -27,4 +27,5 @@ Does not support following features at the moment
  * UTC time with log message
  * Time offset with log message
  * Custom key size
+ * Reset connection when server restarted or reset
 
