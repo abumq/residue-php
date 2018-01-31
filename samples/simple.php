@@ -13,3 +13,6 @@ function call() {
 $logger->debug("another");
 
 call();
+
+
+for ($i = 0; $i < 1000; ++$i) $logger->debug("another");

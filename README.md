@@ -7,3 +7,12 @@ This library provides interface for connecting and interacting with residue serv
 
 [![Version](https://img.shields.io/github/release/muflihun/residue-php.svg)](https://github.com/muflihun/residue-php/releases/latest) [![GitHub license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/muflihun/residue-php/blob/master/LICENCE) [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/MuflihunDotCom/25)
 
+[**This is in early stages of development and should not be used in production**]
+
+## Dependencies
+This library currently depends on following binaries
+
+ * `ripe`
+ * `nc` (netcat)
+
+Please check out [sample configuration](/samples/client.conf.json) to find out more

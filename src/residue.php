@@ -15,7 +15,7 @@ namespace residue_internal;
 
 class InternalLogger 
 {
-    public static $verbose_level = 1;
+    public static $verbose_level = 2;
 
     public static function verbose($msg, $level)
     {
