@@ -16,7 +16,7 @@ namespace residue_internal;
 
 class InternalLogger 
 {
-    public static $verbose_level = 9;
+    public static $verbose_level = 1;
 
     public static function verbose($msg, $level)
     {
@@ -38,7 +38,7 @@ class InternalLogger
 
     public static function info($msg)
     {
-        InternalLogger::verbose($msg, 2);
+        InternalLogger::verbose("info:  " . $msg, 2);
     }
 }
 
@@ -68,9 +68,9 @@ namespace muflihun;
 
 class Residue 
 {
-    public $application_name = "Application";
-    public $logger_id = "sample-app";
+    const TOUCH_THRESHOLD = 60;
 
+    private $logger_id = "default";
     protected static $_instance;
 
     public static function instance($config_file = null)
@@ -205,6 +205,14 @@ class Residue
         return "{$this->build_ripe()} | {$this->build_nc_logging()}";
     }
 
+    private function has_flag($f)
+    {
+        if ($this->connection === null) {
+            return false;
+        }
+        return ($this->connection->flags & $f) !== 0;
+    }
+
     private function reset()
     {
         $this->connected = false;
@@ -264,8 +272,18 @@ class Residue
 
         $this->update_connection();
 
+        $this->delete_all_tokens();
+
         // verify
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
+    }
+
+    private function delete_all_tokens()
+    {
+        \residue_internal\InternalLogger::trace("delete_all_tokens()");
+        if (file_exists($this->config->tokens_dir)) {
+            array_map('unlink', glob("{$this->config->tokens_dir}/*"));
+        }
     }
 
     private function touch()
@@ -305,6 +323,15 @@ class Residue
         return $this->connection->age === 0 || $this->connection->date_created + $this->connection->age >= $this->now();
     }
 
+    private function should_touch()
+    {
+        \residue_internal\InternalLogger::trace("validate_connection()");
+        if ($this->connection === null || $this->connection->age === 0) {
+            return false;
+        }
+        return $this->connection->age - ($this->now() - $this->connection->date_created) < Residue::TOUCH_THRESHOLD;
+    }
+
     private function now()
     {
         return round(microtime(true));
@@ -313,6 +340,10 @@ class Residue
     private function validate_token($token)
     {
         \residue_internal\InternalLogger::trace("validate_token()");
+        if (!$this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
+            \residue_internal\InternalLogger::info("no token required");
+            return true;
+        }
         return $token !== null && ($token->life === 0 || $this->now() - $token->date_created < $token->life);
     }
 
@@ -362,7 +393,7 @@ class Residue
         return null;
     }
 
-    private function write_log($logger_id, $msg, $level, $file = "file.php", $line = 111, $vlevel = 0)
+    private function write_log($logger_id, $msg, $level, $vlevel = 0)
     {
         \residue_internal\InternalLogger::trace("write_log()");
         if (!$this->connected) {
@@ -373,30 +404,45 @@ class Residue
             \residue_internal\InternalLogger::info("connection expired");
             $this->touch();
         }
-        if (array_key_exists($logger_id, $this->tokens)) {
-            if (!$this->validate_token($this->tokens[$logger_id])) {
-                \residue_internal\InternalLogger::info("token expired (memory)");
-                $this->obtain_token($logger_id, $this->read_access_code($logger_id));
-            }
-        } else {
-            $this->update_token($logger_id);
-            if (!$this->validate_token($this->tokens[$logger_id])) {
-                \residue_internal\InternalLogger::info("token expired");
-                $this->obtain_token($logger_id, $this->read_access_code($logger_id));
+        if ($this->should_touch()) {
+            \residue_internal\InternalLogger::info("connection should be touched");
+            $this->touch();
+        }
+        if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
+            if (array_key_exists($logger_id, $this->tokens)) {
+                if (!$this->validate_token($this->tokens[$logger_id])) {
+                    \residue_internal\InternalLogger::info("token expired (memory)");
+                    $this->obtain_token($logger_id, $this->read_access_code($logger_id));
+                }
+            } else {
+                $this->update_token($logger_id);
+                if (!$this->validate_token($this->tokens[$logger_id])) {
+                    \residue_internal\InternalLogger::info("token expired");
+                    $this->obtain_token($logger_id, $this->read_access_code($logger_id));
+                }
             }
         }
+        $debug_trace = &debug_backtrace();
         $req = array(
-            "token" => $this->tokens[$logger_id]->token,
             "datetime" => $this->now() * 1000,
             "logger" => $logger_id,
             "msg" => $msg,
-            "app" => $this->application_name,
+            "app" => $this->config->application_id,
             "level" => $level,
-            "file" => $file,
-            "line" => $line
+            "file" => $debug_trace[1]["file"],
+            "line" => $debug_trace[1]["line"],            
+            "func" => count($debug_trace) > 2 ? $debug_trace[2]["function"] : ""
         );
+        if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
+            $req["token"] = $this->tokens[$logger_id]->token;
+        }
         $request = $this->buildReq($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()}");
+    }
+
+    public function set_logger($logger_id)
+    {
+        $this->logger_id = $logger_id;
     }
 
     // ------- Logging functions ---------
@@ -433,6 +479,6 @@ class Residue
 
     public function verbose($msg, $vlevel)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Verbose, "file", 0, $vlevel);
+        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Verbose, $vlevel);
     }
 }
