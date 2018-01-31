@@ -16,7 +16,7 @@ class ResidueInternalLogger
 {
     public static function err($msg)
     {
-        echo "ERR: $msg";
+        echo "ERR: $msg\n";
     }
 }
 
@@ -62,7 +62,8 @@ class Residue
         $this->config->host = substr($this->config->url, 0, strpos($this->config->url, ":"));
         $this->config->port = intval(substr($this->config->url, strpos($this->config->url, ":") + 1));
 
-        $this->config->private_key_file = $this->config->session_dir . "/priv.pem";
+        $this->config->private_key_file = $this->config->session_dir . "/rsa.priv.pem";
+        $this->config->public_key_file = $this->config->session_dir . "/rsa.pub.pem";
         $this->config->connection_file = $this->config->session_dir . "/conn";
 
         $this->connect();
@@ -86,6 +87,7 @@ class Residue
 
     private function connect()
     {
+        $this->connected = false;
         $req = array(
             "type" => 1 // CONNECT
         );
@@ -102,9 +104,18 @@ class Residue
 
         $request = $this->buildReq($req);
         $result = shell_exec("echo '$request' | {$this->config->nc_bin} {$this->config->host} {$this->config->port}");
-        $decrypted_result = shell_exec("echo '$result' | {$this->config->ripe_bin} -d --rsa --clean --in-key {$this->config->private_key_file} --base64");
-        file_put_contents($this->config->connection_file, $decrypted_result);
 
+        $plain_json = json_decode($result);
+        if ($plain_json !== null) {
+            ResidueInternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            return false;
+        }
+        $client_secret_param = "";
+        if (!empty($this->config->client_key_secret)) {
+            $client_secret_param = " --secret {$this->config->client_key_secret} ";
+        }
+        $decrypted_result = shell_exec("echo '$result' | {$this->config->ripe_bin} -d --rsa --clean --in-key {$this->config->private_key_file} $client_secret_param --base64");
+        file_put_contents($this->config->connection_file, $decrypted_result);
         $this->update_connection();
         
         // acknowledge
@@ -114,6 +125,11 @@ class Residue
         );
         $request = $this->buildReq($req);
         $result = shell_exec("echo '$request' | {$this->config->ripe_bin} -e --key {$this->connection->key} --client-id {$this->connection->client_id} | {$this->config->nc_bin} {$this->config->host} {$this->config->port}");
+        $plain_json = json_decode($result);
+        if ($plain_json !== null) {
+            ResidueInternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            return false;
+        }
         $decrypted_result = shell_exec("echo '$result' | {$this->config->ripe_bin} -d --key {$this->connection->key} --base64");
         file_put_contents($this->config->connection_file, $decrypted_result);
 
