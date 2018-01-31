@@ -16,3 +16,16 @@ This library currently depends on following binaries
  * `nc` (netcat)
 
 Please check out [sample configuration](/samples/client.conf.json) to find out more
+
+## Progress
+Does not support following features at the moment
+
+ * Unknown clients
+ * When server `requires_timestamp` flag is set
+ * Bulk requests
+ * Compression (will require when bulk requests is done)
+ * UTC time with log message
+ * Time offset with log message
+ * Custom key size
+ * Reset connection when server restarted or reset
+
