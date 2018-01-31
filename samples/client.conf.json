@@ -14,6 +14,8 @@
     "main_thread_id": "Main Thread",
     "client_id": "muflihun00102030",
     "client_private_key": "keys/muflihun00102030.pem",
+    "client_key_secret": "",
+    "server_public_key": "keys/server.pub.pem",
     "ripe_bin": "ripe",
     "nc_bin": "nc",
     "session_dir": "/tmp/resphp/"
