@@ -293,11 +293,9 @@ class Residue
             return false;
         }
 
-        $this->reset();
-
         $req = array(
             "client_id" => $this->connection->client_id,
-            "type" => 4
+            "type" => 3
         );
         $request = $this->buildReq($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc()}");
@@ -309,8 +307,10 @@ class Residue
         }
         file_put_contents($this->config->connection_file, $decrypted_result);
         $this->update_connection();
+        $this->delete_all_tokens();
 
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
+        return true;
     }
 
     private function validate_connection()
