@@ -149,6 +149,8 @@ class Residue
     {
         if (file_exists($this->config->connection_file)) {
             $this->connection = json_decode(file_get_contents($this->config->connection_file));
+        } else {
+            $this->connection = null;
         }
     }
 
