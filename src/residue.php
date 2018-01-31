@@ -65,6 +65,17 @@ class Residue
         $this->config->private_key_file = $this->config->session_dir . "/rsa.priv.pem";
         $this->config->public_key_file = $this->config->session_dir . "/rsa.pub.pem";
         $this->config->connection_file = $this->config->session_dir . "/conn";
+        $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
+
+        if (!file_exists($this->config->tokens_dir)) {
+            if (!mkdir($this->config->tokens_dir , 0777, true)) {
+                ResidueInternalLogger::err("Failed to create directory [{$this->config->tokens_dir}]");
+                return false;
+            }
+        } else if (!is_writable($this->config->tokens_dir)) {
+            ResidueInternalLogger::err("[{$this->config->tokens_dir}] is not writable");
+            return false;
+        }
 
         $this->connect();
 
@@ -85,9 +96,63 @@ class Residue
         $this->connection = json_decode(file_get_contents($this->config->connection_file));
     }
 
+    private function decrypt($enc, $method = 1) // 1 = AES ; 2 = RSA
+    {
+        switch ($method) {
+            case 1:
+                return shell_exec("echo '$enc' | {$this->config->ripe_bin} -d --key {$this->connection->key} --base64");
+            case 2:
+                $client_secret_param = "";
+                if (!empty($this->config->client_key_secret)) {
+                   $client_secret_param = " --secret {$this->config->client_key_secret} ";
+                }
+                return shell_exec("echo '$enc' | {$this->config->ripe_bin} -d --rsa --clean --in-key {$this->config->private_key_file} $client_secret_param --base64");
+                break;
+            default:
+                return null;
+        }
+    }
+
+    private function build_ripe()
+    {
+        return "{$this->config->ripe_bin} -e --key {$this->connection->key} --client-id {$this->connection->client_id}";
+    }
+
+    private function build_nc()
+    {
+        return "{$this->config->nc_bin} {$this->config->host} {$this->config->port}";
+    }
+
+    private function build_nc_token()
+    {
+        return "{$this->config->nc_bin} {$this->config->host} {$this->connection->token_port}";
+    }
+
+    private function build_nc_logging()
+    {
+        return "{$this->config->nc_bin} {$this->config->host} {$this->connection->logging_port}";
+    }
+
+    private function build_ripe_nc()
+    {
+        return "{$this->build_ripe()} | {$this->build_nc()}";
+    }
+
+    private function build_ripe_nc_token()
+    {
+        return "{$this->build_ripe()} | {$this->build_nc_token()}";
+    }
+
+    private function build_ripe_nc_logging()
+    {
+        return "{$this->build_ripe()} | {$this->build_nc_logging()}";
+    }
+
     private function connect()
     {
         $this->connected = false;
+        $this->connection = null;
+
         $req = array(
             "type" => 1 // CONNECT
         );
@@ -103,19 +168,20 @@ class Residue
         file_put_contents($this->config->private_key_file, $private_key_contents);
 
         $request = $this->buildReq($req);
-        $result = shell_exec("echo '$request' | {$this->config->nc_bin} {$this->config->host} {$this->config->port}");
+
+        $server_encrypt_param = "";
+        if (!empty($this->config->server_public_key)) {
+            $server_encrypt_param = " | {$this->config->ripe_bin} -e --rsa --in-key {$this->config->server_public_key} ";
+        }
+
+        $result = shell_exec("printf \"`echo '$request' $server_encrypt_param`\r\n\r\n\" | {$this->build_nc()}");
 
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
             ResidueInternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
             return false;
         }
-        $client_secret_param = "";
-        if (!empty($this->config->client_key_secret)) {
-            $client_secret_param = " --secret {$this->config->client_key_secret} ";
-        }
-        $decrypted_result = shell_exec("echo '$result' | {$this->config->ripe_bin} -d --rsa --clean --in-key {$this->config->private_key_file} $client_secret_param --base64");
-        file_put_contents($this->config->connection_file, $decrypted_result);
+        file_put_contents($this->config->connection_file, $this->decrypt($result, 2));
         $this->update_connection();
         
         // acknowledge
@@ -124,14 +190,13 @@ class Residue
             "type" => 2 // ACK
         );
         $request = $this->buildReq($req);
-        $result = shell_exec("echo '$request' | {$this->config->ripe_bin} -e --key {$this->connection->key} --client-id {$this->connection->client_id} | {$this->config->nc_bin} {$this->config->host} {$this->config->port}");
+        $result = shell_exec("echo '$request' | {$this->build_ripe_nc()}");
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
             ResidueInternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
             return false;
         }
-        $decrypted_result = shell_exec("echo '$result' | {$this->config->ripe_bin} -d --key {$this->connection->key} --base64");
-        file_put_contents($this->config->connection_file, $decrypted_result);
+        file_put_contents($this->config->connection_file, $this->decrypt($result));
 
         $this->update_connection();
 
@@ -139,10 +204,28 @@ class Residue
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
     }
 
+    private function obtain_token($logger_id, $access_code)
+    {
+        $req = array(
+            "logger_id" => $logger_id,
+            "access_code" => $access_code
+        );
+        $request = $this->buildReq($req);
+        $result = shell_exec("echo '$request' | {$this->build_ripe_nc_token()}");
+        $decrypted_result = $this->decrypt($result);
+        $decoded = json_decode($decrypted_result);
+        if ($decoded !== null && !empty($decoded->error_text)) {
+            ResidueInternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            return false;
+        }
+        file_put_contents($this->config->tokens_dir . $logger_id, $decrypted_result);
+    }
+
     // ------- Logging functions ---------
 
     public function info($msg)
     {
+        $this->obtain_token("sample-app", "a2dcb");
         echo $msg . "\n";
     }
 }
