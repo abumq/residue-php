@@ -15,13 +15,14 @@ namespace residue_internal;
 
 class InternalLogger 
 {
-    public static $verbose_level = 2;
+    private static $verbose_level = 2;
+    private static $new_line = "\n";
 
     public static function verbose($msg, $level)
     {
         if ($level <= InternalLogger::$verbose_level) {
             echo $msg;
-            echo "\n";
+            echo InternalLogger::$new_line;
         }
     }
 
@@ -438,7 +439,7 @@ class Residue
             $req["token"] = $this->tokens[$logger_id]->token;
         }
         $request = $this->buildReq($req);
-        $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()}");
+        $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()} > /dev/null 2>/dev/null &");
     }
 
     public function set_logger($logger_id)
