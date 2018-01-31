@@ -1,5 +1,4 @@
 <?php
-
 //
 // Official PHP client library for Residue logging server
 //
