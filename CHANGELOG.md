@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.0.2]
 ### Improvements
  - Logging command is run in background
 
