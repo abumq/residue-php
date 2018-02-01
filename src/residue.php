@@ -33,7 +33,7 @@ class InternalLogger
 
     public static function trace($msg)
     {
-        InternalLogger::verbose("trace: " . $msg, 6);
+        InternalLogger::verbose("trace: " . $msg, 9);
     }
 
     public static function info($msg)
@@ -64,23 +64,26 @@ abstract class Flag
     const COMPRESSION = 256;
 }
 
-namespace muflihun;
+namespace residue;
 
 class Residue 
 {
     const TOUCH_THRESHOLD = 60;
 
-    private $logger_id = "default";
+    private $config_file = null;
     protected static $_instance;
 
-    public static function instance($config_file = null)
+    public static function init($config_file = null)
     {
+        \residue_internal\InternalLogger::trace("init()");
         if (!(self::$_instance instanceof self)) {
             self::$_instance = new self();
+            \residue_internal\InternalLogger::info("New residue instance");
             if ($config_file !== null) {
-                self::$_instance->init($config_file);
+                self::$_instance->init_connection($config_file);
             }
         }
+        \residue_internal\InternalLogger::info(self::$_instance === null ? "Residue: Null" : "Residue: Obj");
         return self::$_instance;
     }
 
@@ -94,8 +97,9 @@ class Residue
 
     }
 
-    private function init($config_file)
+    private function init_connection($config_file)
     {
+        \residue_internal\InternalLogger::trace("init_connection()");
         $this->config_file = $config_file;
         $this->config = json_decode(file_get_contents($config_file));
         if (!file_exists($this->config->session_dir)) {
@@ -133,6 +137,7 @@ class Residue
             $this->tokens = array();
             $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
         }
+        \residue_internal\InternalLogger::info($this->connected === true ? "Successfully connected" : "Failed to connect");
 
         return true;
     }
@@ -395,7 +400,7 @@ class Residue
         return null;
     }
 
-    private function write_log($logger_id, $msg, $level, $vlevel = 0)
+    public function write_log($logger_id, $msg, $level, $vlevel = 0)
     {
         \residue_internal\InternalLogger::trace("write_log()");
         if (!$this->connected) {
@@ -442,45 +447,73 @@ class Residue
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()} > /dev/null 2>/dev/null &");
     }
 
-    public function set_logger($logger_id)
+    public function initialised()
     {
-        $this->logger_id = $logger_id;
+        return $this->config_file !== null;
     }
+}
 
-    // ------- Logging functions ---------
+class Logger
+{
+    private $logger_id = "default";
+    private $residue_instance = null;
+    private $is_ready = false;
+
+	public function __construct($logger_id = "default")
+	{
+        \residue_internal\InternalLogger::trace("new Logger()");
+
+        $this->logger_id = $logger_id;
+
+        $residue_instance = Residue::init();
+
+        if ($residue_instance->initialised()) {
+            $this->residue_instance = $residue_instance;
+            $this->is_ready = true;
+        } else {
+            \residue_internal\InternalLogger::err("Residue not initialised. You must initialise the residue instance before you can use ResidueLogger");
+        }
+    }
 
     public function info($msg)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Info);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Info);
     }
 
     public function warning($msg)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Warning);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Warning);
     }
 
     public function error($msg)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Error);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Error);
     }
 
     public function debug($msg)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Debug);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Debug);
     }
 
     public function fatal($msg)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Fatal);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Fatal);
     }
 
     public function trace($msg)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Trace);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Trace);
     }
 
     public function verbose($msg, $vlevel)
     {
-        $this->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Verbose, $vlevel);
+        if (!$this->is_ready) return;
+        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Verbose, $vlevel);
     }
 }
