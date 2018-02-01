@@ -1,9 +1,9 @@
 <?php
 include_once ("../src/residue.php");
 
-$logger = \muflihun\Residue::instance("client.conf.json");
+\residue\Residue::init("client.conf.json");
 
-$logger->set_logger("sample-app"); // defaults to 'default' logger
+$logger = new \residue\Logger("sample-app");
 
 function call() {
     global $logger;
