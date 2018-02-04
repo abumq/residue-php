@@ -21,7 +21,6 @@ Please check out [sample configuration](/samples/client.conf.json) to find out m
 Does not support following features at the moment
 
  * Unknown clients
- * When server `requires_timestamp` flag is set
  * Bulk requests
  * Compression (will require when bulk requests is done)
  * UTC time with log message

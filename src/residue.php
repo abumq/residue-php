@@ -10,6 +10,8 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
+// Version: (unreleased)
+//
 
 namespace residue_internal;
 
@@ -233,6 +235,7 @@ class Residue
         $this->reset();
 
         $req = array(
+            "_t" => $this->now(),
             "type" => 1 // CONNECT
         );
         $private_key_contents = "";
@@ -265,6 +268,7 @@ class Residue
         
         // acknowledge
         $req = array(
+            "_t" => $this->now(),
             "client_id" => $this->connection->client_id,
             "type" => 2 // ACK
         );
@@ -302,6 +306,7 @@ class Residue
         }
 
         $req = array(
+            "_t" => $this->now(),
             "client_id" => $this->connection->client_id,
             "type" => 3
         );
@@ -358,6 +363,7 @@ class Residue
     {
         \residue_internal\InternalLogger::trace("obtain_token()");
         $req = array(
+            "_t" => $this->now(),
             "logger_id" => $logger_id,
             "access_code" => $access_code
         );
@@ -431,6 +437,7 @@ class Residue
         }
         $debug_trace = &debug_backtrace();
         $req = array(
+            "_t" => $this->now(),
             "datetime" => $this->now() * 1000,
             "logger" => $logger_id,
             "msg" => $msg,

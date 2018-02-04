@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased] --- UPDATE VERSION ON residue.php
+### Updates
+- Support `requires_timestamp` flag
+
 ## [0.0.2]
 ### Improvements
  - Logging command is run in background
