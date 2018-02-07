@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased] - Update residue.php
+### Updates
+- Lock while connecting
+
 ## [0.0.3]
 ### Updates
 - Support `requires_timestamp` flag
