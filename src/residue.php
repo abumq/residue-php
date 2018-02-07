@@ -119,7 +119,12 @@ class Residue
         $this->config->connection_file = $this->config->session_dir . "/conn";
         $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
         $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
+        $this->config->connection_lock_file = $this->config->session_dir . "/conn.lock";
         
+        while ($this->locked()) {
+            sleep (1);
+        }
+
         // connection reset
         if (file_exists($this->config->connection_mtime_file) && file_exists($this->config->connection_file)) {
             $mt = intval(file_get_contents($this->config->connection_mtime_file));
@@ -157,6 +162,23 @@ class Residue
         return true;
     }
 
+    private function locked()
+    {
+        return file_exists($this->config->connection_lock_file);
+    }
+
+    private function unlock()
+    {
+        if ($this->locked()) {
+            unlink($this->config->connection_lock_file);
+        }
+    }
+
+    private function lock()
+    {
+        touch($this->config->connection_lock_file);
+    }
+
     private function buildReq($req_obj, $is_b64 = false)
     {
         $enc = json_encode($req_obj);
@@ -173,6 +195,7 @@ class Residue
         } else {
             $this->connection = null;
         }
+        $this->unlock();
     }
 
     private function decrypt($enc, $method = 1) // 1 = AES ; 2 = RSA
@@ -244,6 +267,7 @@ class Residue
 
     private function connect()
     {
+        $this->lock();
         \residue_internal\InternalLogger::trace("connect()");
         $this->reset();
 
@@ -274,6 +298,7 @@ class Residue
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
             \residue_internal\InternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            $this->unlock();
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result, 2));
@@ -376,6 +401,7 @@ class Residue
 
     private function obtain_token($logger_id, $access_code)
     {
+        $this->lock();
         \residue_internal\InternalLogger::trace("obtain_token()");
         $req = array(
             "_t" => $this->now(),
@@ -408,6 +434,7 @@ class Residue
                 "date_created" => $token_info->date_created
             )));
         }
+        $this->unlock();
     }
 
     private function read_access_code($logger_id)
