@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - Update residue.php
+## [0.0.4]
 ### Updates
 - Lock while connecting
 

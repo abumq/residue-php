@@ -10,14 +10,14 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 0.0.3
+// Version: 0.0.4
 //
 
 namespace residue_internal;
 
 class InternalLogger 
 {
-    private static $verbose_level = 9;
+    private static $verbose_level = 0;
     private static $new_line = "\n";
 
     public static function verbose($msg, $level)
