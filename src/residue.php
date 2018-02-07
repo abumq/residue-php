@@ -121,8 +121,12 @@ class Residue
         $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
         $this->config->connection_lock_file = $this->config->session_dir . "/conn.lock";
         
+        $sleepingFor = 0;
         while ($this->locked()) {
             sleep (1);
+            if ($sleepingFor >= 5) {
+                $this->unlock();
+            }
         }
 
         // connection reset
