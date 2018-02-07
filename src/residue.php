@@ -17,7 +17,7 @@ namespace residue_internal;
 
 class InternalLogger 
 {
-    private static $verbose_level = 0;
+    private static $verbose_level = 9;
     private static $new_line = "\n";
 
     public static function verbose($msg, $level)
@@ -320,12 +320,14 @@ class Residue
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
             \residue_internal\InternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            $this->unlock();
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result));
         file_put_contents($this->config->connection_mtime_file, $this->now());
 
         $this->update_connection();
+        $this->unlock();
 
         $this->delete_all_tokens();
 
@@ -344,8 +346,10 @@ class Residue
     private function touch()
     {
         \residue_internal\InternalLogger::trace("touch()");
+        $this->lock();
         if (!$this->connected) {
             $this->connect();
+            $this->unlock();
             return false;
         }
 
@@ -360,6 +364,7 @@ class Residue
         $decoded = json_decode($decrypted_result);
         if ($decoded !== null && !empty($decoded->error_text)) {
             \residue_internal\InternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            $this->unlock();
             return false;
         }
         file_put_contents($this->config->connection_file, $decrypted_result);
@@ -367,6 +372,7 @@ class Residue
         $this->delete_all_tokens();
 
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
+        $this->unlock();
         return true;
     }
 
@@ -418,12 +424,14 @@ class Residue
         $decoded = json_decode($decrypted_result);
         if ($decoded !== null && !empty($decoded->error_text)) {
             \residue_internal\InternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            $this->unlock();
             return false;
         }
         $decoded->date_created = $this->now();
         $final = json_encode($decoded);
         file_put_contents($this->config->tokens_dir . $logger_id, $final);
         $this->update_token($logger_id);
+        $this->unlock();
     }
 
     private function update_token($logger_id)
@@ -438,7 +446,6 @@ class Residue
                 "date_created" => $token_info->date_created
             )));
         }
-        $this->unlock();
     }
 
     private function read_access_code($logger_id)
