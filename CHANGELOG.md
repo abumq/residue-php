@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.0.4]
+### Updates
+- Lock while connecting
+
 ## [0.0.3]
 ### Updates
 - Support `requires_timestamp` flag

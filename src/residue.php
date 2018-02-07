@@ -10,7 +10,7 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 0.0.3
+// Version: 0.0.4
 //
 
 namespace residue_internal;
@@ -119,7 +119,17 @@ class Residue
         $this->config->connection_file = $this->config->session_dir . "/conn";
         $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
         $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
+        $this->config->connection_lock_file = $this->config->session_dir . "/conn.lock";
         
+        $sleepingFor = 0;
+        while ($this->locked()) {
+            sleep(1);
+            if ($sleepingFor++ >= 5) {
+                \residue_internal\InternalLogger::info("Unlocking manually");
+                $this->unlock();
+            }
+        }
+
         // connection reset
         if (file_exists($this->config->connection_mtime_file) && file_exists($this->config->connection_file)) {
             $mt = intval(file_get_contents($this->config->connection_mtime_file));
@@ -155,6 +165,23 @@ class Residue
         \residue_internal\InternalLogger::info($this->connected === true ? "Successfully connected" : "Failed to connect");
 
         return true;
+    }
+
+    private function locked()
+    {
+        return file_exists($this->config->connection_lock_file);
+    }
+
+    private function unlock()
+    {
+        if ($this->locked()) {
+            unlink($this->config->connection_lock_file);
+        }
+    }
+
+    private function lock()
+    {
+        touch($this->config->connection_lock_file);
     }
 
     private function buildReq($req_obj, $is_b64 = false)
@@ -244,6 +271,7 @@ class Residue
 
     private function connect()
     {
+        $this->lock();
         \residue_internal\InternalLogger::trace("connect()");
         $this->reset();
 
@@ -274,6 +302,7 @@ class Residue
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
             \residue_internal\InternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            $this->unlock();
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result, 2));
@@ -291,6 +320,7 @@ class Residue
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
             \residue_internal\InternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            $this->unlock();
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result));
@@ -302,6 +332,7 @@ class Residue
 
         // verify
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
+        $this->unlock();
     }
 
     private function delete_all_tokens()
@@ -315,8 +346,10 @@ class Residue
     private function touch()
     {
         \residue_internal\InternalLogger::trace("touch()");
+        $this->lock();
         if (!$this->connected) {
             $this->connect();
+            $this->unlock();
             return false;
         }
 
@@ -331,6 +364,7 @@ class Residue
         $decoded = json_decode($decrypted_result);
         if ($decoded !== null && !empty($decoded->error_text)) {
             \residue_internal\InternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            $this->unlock();
             return false;
         }
         file_put_contents($this->config->connection_file, $decrypted_result);
@@ -338,6 +372,7 @@ class Residue
         $this->delete_all_tokens();
 
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
+        $this->unlock();
         return true;
     }
 
@@ -376,6 +411,7 @@ class Residue
 
     private function obtain_token($logger_id, $access_code)
     {
+        $this->lock();
         \residue_internal\InternalLogger::trace("obtain_token()");
         $req = array(
             "_t" => $this->now(),
@@ -388,12 +424,14 @@ class Residue
         $decoded = json_decode($decrypted_result);
         if ($decoded !== null && !empty($decoded->error_text)) {
             \residue_internal\InternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            $this->unlock();
             return false;
         }
         $decoded->date_created = $this->now();
         $final = json_encode($decoded);
         file_put_contents($this->config->tokens_dir . $logger_id, $final);
         $this->update_token($logger_id);
+        $this->unlock();
     }
 
     private function update_token($logger_id)
