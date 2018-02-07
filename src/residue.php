@@ -17,7 +17,7 @@ namespace residue_internal;
 
 class InternalLogger 
 {
-    private static $verbose_level = 2;
+    private static $verbose_level = 9;
     private static $new_line = "\n";
 
     public static function verbose($msg, $level)
@@ -337,7 +337,7 @@ class Residue
 
     private function should_touch()
     {
-        \residue_internal\InternalLogger::trace("validate_connection()");
+        \residue_internal\InternalLogger::trace("should_touch()");
         if ($this->connection === null || $this->connection->age === 0) {
             return false;
         }
@@ -415,7 +415,8 @@ class Residue
         }
         if (!$this->validate_connection()) {
             \residue_internal\InternalLogger::info("connection expired");
-            $this->touch();
+            $this->connected = false;
+            $this->connect();
         }
         if ($this->should_touch()) {
             \residue_internal\InternalLogger::info("connection should be touched");

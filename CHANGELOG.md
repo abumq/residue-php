@@ -4,6 +4,9 @@
 ### Updates
 - Support `requires_timestamp` flag
 
+### Fixes
+- Fix `write_log` when `validate_connection` returns false
+
 ## [0.0.2]
 ### Improvements
  - Logging command is run in background
