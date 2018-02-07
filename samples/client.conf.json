@@ -18,5 +18,6 @@
     "server_public_key": "keys/server.pub.pem",
     "ripe_bin": "ripe",
     "nc_bin": "nc",
-    "session_dir": "/tmp/resphp/"
+    "session_dir": "/tmp/resphp/",
+    "reset_conn": 120
 }

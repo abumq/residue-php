@@ -120,7 +120,22 @@ class Residue
         $this->config->private_key_file = $this->config->session_dir . "/rsa.priv.pem";
         $this->config->public_key_file = $this->config->session_dir . "/rsa.pub.pem";
         $this->config->connection_file = $this->config->session_dir . "/conn";
+        $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
         $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
+        
+        // connection reset
+        if (file_exists($this->config->connection_mtime_file) && file_exists($this->config->connection_file)) {
+            $mt = intval(file_get_contents($this->config->connection_mtime_file));
+            $age = $this->now() - $mt;
+            if ($age >= $this->config->reset_conn) {
+                \residue_internal\InternalLogger::info("Resetting connection");
+                unlink($this->config->connection_file);
+                unlink($this->config->connection_mtime_file);
+                $this->delete_all_tokens();
+            } else {
+                \residue_internal\InternalLogger::info("Ignoring conn reset [age: $age]");
+            }
+        }
 
         if (!file_exists($this->config->tokens_dir)) {
             if (!mkdir($this->config->tokens_dir , 0777, true)) {
@@ -264,6 +279,7 @@ class Residue
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result, 2));
+        file_put_contents($this->config->connection_mtime_file, $this->now());
         $this->update_connection();
         
         // acknowledge
@@ -280,6 +296,7 @@ class Residue
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result));
+        file_put_contents($this->config->connection_mtime_file, $this->now());
 
         $this->update_connection();
 
