@@ -91,8 +91,8 @@ class Residue
         self::$_instance = null;
     }
 
-	private function __construct()
-	{
+    private function __construct()
+    {
 
     }
 
@@ -461,7 +461,13 @@ class Residue
     
     public function build_thread_id()
     {
-        if (isset($_SERVER) && array_key_exists('REMOTE_ADDR', $_SERVER)) {
+        if (isset($_SERVER)) {
+            if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+                return $_SERVER['HTTP_CLIENT_IP'];
+            }
+            if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                return $_SERVER['HTTP_X_FORWARDED_FOR'];
+            }
             return $_SERVER['REMOTE_ADDR'];
         }
         return "";
@@ -535,8 +541,8 @@ class Logger
     private $residue_instance = null;
     private $is_ready = false;
 
-	public function __construct($logger_id = "default")
-	{
+    public function __construct($logger_id = "default")
+    {
         \residue_internal\InternalLogger::trace("new Logger()");
 
         $this->logger_id = $logger_id;
