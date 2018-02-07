@@ -10,7 +10,7 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 0.0.4
+// Version: 0.0.4+
 //
 
 namespace residue_internal;
@@ -458,6 +458,14 @@ class Residue
         }
         return null;
     }
+    
+    public function build_thread_id()
+    {
+        if (isset($_SERVER) && array_key_exists('REMOTE_ADDR', $_SERVER)) {
+            return $_SERVER['REMOTE_ADDR'];
+        }
+        return "";
+    }
 
     public function write_log($logger_id, $msg, $level, $vlevel = 0)
     {
@@ -507,6 +515,10 @@ class Residue
         if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
             $req["token"] = $this->tokens[$logger_id]->token;
         }
+        if ($vlevel > 0) {
+            $req["vlevel"] = $vlevel;
+        }
+        $req["thread"] = $this->build_thread_id();
         $request = $this->buildReq($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()} > /dev/null 2>/dev/null &");
     }

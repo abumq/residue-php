@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] - update version on residue.php
+### Updates
+- Support `%thread`
+
+### Fixes
+- Fixed `%vlevel`
+
 ## [0.0.4]
 ### Updates
 - Lock while connecting
