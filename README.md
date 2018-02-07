@@ -21,11 +21,49 @@ Please check out [sample configuration](/samples/client.conf.json) to find out m
 Does not support following features at the moment
 
  * Unknown clients
- * When server `requires_timestamp` flag is set
  * Bulk requests
  * Compression (will require when bulk requests is done)
- * UTC time with log message
- * Time offset with log message
+ * Plain log request
  * Custom key size
- * Reset connection when server restarted or reset
 
+## Config
+
+| **Config** | **Type** | **Description** |
+|------------|----------|-----------------|
+| `url`      | String   | Combination of URI and port of residue server |
+| `access_codes`      | Object   | Array of access codes |
+| `application_id`      | String   | Application ID for `%app` format specifier |
+| `rsa_key_size`      | Number   | RSA key size (generated randomly) for unknown clients |
+| `time_offset`      | Number   | Log time offset (in seconds) |
+| `client_id`      | String   | Client ID that server knows this client as |
+| `client_private_key`      | String   | Full path of RSA private key |
+| `client_key_secret`      | String   | Secret (passphrase) for encrypted private key (if any) |
+| `server_public_key`      | String   | Full path to server public key (if any) |
+| `ripe_bin`      | String   | Command to successfully run [ripe](https://github.com/muflihun/ripe) binary using user that will run your PHP script |
+| `nc_bin`      | String   | Command to successfully run [nc](https://linux.die.net/man/1/nc) binary using user that will run your PHP script |
+| `session_dir`      | String   | Full path to empty directory for storing temporary objects by script (e.g, connection params, tokens etc) |
+| `reset_conn`      | Number   | Resets the connection and ignores objects in `session_dir` after these seconds |
+
+### Sample Config
+```
+{
+    "url": "localhost:8777",
+    "access_codes": [
+        {
+            "logger_id": "sample-app",
+            "code": "a2dcb"
+        }
+    ],
+    "application_id": "com.muflihun.residue.sampleapp",
+    "rsa_key_size": 2048,
+    "time_offset": 0,
+    "client_id": "muflihun00102030",
+    "client_private_key": "keys/muflihun00102030.pem",
+    "client_key_secret": "",
+    "server_public_key": "keys/server.pub.pem",
+    "ripe_bin": "ripe",
+    "nc_bin": "nc",
+    "session_dir": "/tmp/resphp/",
+    "reset_conn": 120
+}
+```

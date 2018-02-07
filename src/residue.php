@@ -10,12 +10,14 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
+// Version: 0.0.3
+//
 
 namespace residue_internal;
 
 class InternalLogger 
 {
-    private static $verbose_level = 2;
+    private static $verbose_level = 0;
     private static $new_line = "\n";
 
     public static function verbose($msg, $level)
@@ -59,9 +61,6 @@ abstract class Flag
     const ALLOW_UNKNOWN_LOGGERS = 1;
     const REQUIRES_TOKEN = 2;
     const ALLOW_DEFAULT_ACCESS_CODE = 4;
-    const ALLOW_PLAIN_LOG_REQUEST = 8;
-    const ALLOW_BULK_LOG_REQUEST = 16;
-    const COMPRESSION = 256;
 }
 
 namespace residue;
@@ -118,7 +117,23 @@ class Residue
         $this->config->private_key_file = $this->config->session_dir . "/rsa.priv.pem";
         $this->config->public_key_file = $this->config->session_dir . "/rsa.pub.pem";
         $this->config->connection_file = $this->config->session_dir . "/conn";
+        $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
         $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
+        
+        // connection reset
+        if (file_exists($this->config->connection_mtime_file) && file_exists($this->config->connection_file)) {
+            $mt = intval(file_get_contents($this->config->connection_mtime_file));
+            $age = $this->now() - $mt;
+            if ($age >= $this->config->reset_conn) {
+                \residue_internal\InternalLogger::info("Resetting connection");
+                unlink($this->config->connection_file);
+                unlink($this->config->connection_mtime_file);
+                $this->delete_all_tokens();
+            } else {
+                $diff = $this->config->reset_conn - $age;
+                \residue_internal\InternalLogger::info("Connection reset in {$diff}s (Age: {$age}s)");
+            }
+        }
 
         if (!file_exists($this->config->tokens_dir)) {
             if (!mkdir($this->config->tokens_dir , 0777, true)) {
@@ -233,6 +248,7 @@ class Residue
         $this->reset();
 
         $req = array(
+            "_t" => $this->now(),
             "type" => 1 // CONNECT
         );
         $private_key_contents = "";
@@ -261,10 +277,12 @@ class Residue
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result, 2));
+        file_put_contents($this->config->connection_mtime_file, $this->now());
         $this->update_connection();
         
         // acknowledge
         $req = array(
+            "_t" => $this->now(),
             "client_id" => $this->connection->client_id,
             "type" => 2 // ACK
         );
@@ -276,6 +294,7 @@ class Residue
             return false;
         }
         file_put_contents($this->config->connection_file, $this->decrypt($result));
+        file_put_contents($this->config->connection_mtime_file, $this->now());
 
         $this->update_connection();
 
@@ -302,6 +321,7 @@ class Residue
         }
 
         $req = array(
+            "_t" => $this->now(),
             "client_id" => $this->connection->client_id,
             "type" => 3
         );
@@ -332,7 +352,7 @@ class Residue
 
     private function should_touch()
     {
-        \residue_internal\InternalLogger::trace("validate_connection()");
+        \residue_internal\InternalLogger::trace("should_touch()");
         if ($this->connection === null || $this->connection->age === 0) {
             return false;
         }
@@ -341,7 +361,7 @@ class Residue
 
     private function now()
     {
-        return round(microtime(true));
+        return time();
     }
 
     private function validate_token($token)
@@ -358,6 +378,7 @@ class Residue
     {
         \residue_internal\InternalLogger::trace("obtain_token()");
         $req = array(
+            "_t" => $this->now(),
             "logger_id" => $logger_id,
             "access_code" => $access_code
         );
@@ -409,7 +430,8 @@ class Residue
         }
         if (!$this->validate_connection()) {
             \residue_internal\InternalLogger::info("connection expired");
-            $this->touch();
+            $this->connected = false;
+            $this->connect();
         }
         if ($this->should_touch()) {
             \residue_internal\InternalLogger::info("connection should be touched");
@@ -431,6 +453,7 @@ class Residue
         }
         $debug_trace = &debug_backtrace();
         $req = array(
+            "_t" => $this->now(),
             "datetime" => $this->now() * 1000,
             "logger" => $logger_id,
             "msg" => $msg,
@@ -440,6 +463,9 @@ class Residue
             "line" => $debug_trace[1]["line"],            
             "func" => count($debug_trace) > 2 ? $debug_trace[2]["function"] : ""
         );
+        if ($this->config->time_offset > 0) {
+            $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
+        }
         if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
             $req["token"] = $this->tokens[$logger_id]->token;
         }
