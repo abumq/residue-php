@@ -125,6 +125,7 @@ class Residue
         while ($this->locked()) {
             sleep(1);
             if ($sleepingFor++ >= 5) {
+                \residue_internal\InternalLogger::info("Unlocking manually");
                 $this->unlock();
             }
         }
@@ -199,7 +200,6 @@ class Residue
         } else {
             $this->connection = null;
         }
-        $this->unlock();
     }
 
     private function decrypt($enc, $method = 1) // 1 = AES ; 2 = RSA
@@ -327,12 +327,12 @@ class Residue
         file_put_contents($this->config->connection_mtime_file, $this->now());
 
         $this->update_connection();
-        $this->unlock();
 
         $this->delete_all_tokens();
 
         // verify
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
+        $this->unlock();
     }
 
     private function delete_all_tokens()
