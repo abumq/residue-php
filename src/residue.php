@@ -123,8 +123,8 @@ class Residue
         
         $sleepingFor = 0;
         while ($this->locked()) {
-            sleep (1);
-            if ($sleepingFor >= 5) {
+            sleep(1);
+            if ($sleepingFor++ >= 5) {
                 $this->unlock();
             }
         }
