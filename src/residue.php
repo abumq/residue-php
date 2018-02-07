@@ -10,14 +10,14 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: (unreleased)
+// Version: 0.0.3
 //
 
 namespace residue_internal;
 
 class InternalLogger 
 {
-    private static $verbose_level = 9;
+    private static $verbose_level = 0;
     private static $new_line = "\n";
 
     public static function verbose($msg, $level)
@@ -61,9 +61,6 @@ abstract class Flag
     const ALLOW_UNKNOWN_LOGGERS = 1;
     const REQUIRES_TOKEN = 2;
     const ALLOW_DEFAULT_ACCESS_CODE = 4;
-    const ALLOW_PLAIN_LOG_REQUEST = 8;
-    const ALLOW_BULK_LOG_REQUEST = 16;
-    const COMPRESSION = 256;
 }
 
 namespace residue;
@@ -133,7 +130,8 @@ class Residue
                 unlink($this->config->connection_mtime_file);
                 $this->delete_all_tokens();
             } else {
-                \residue_internal\InternalLogger::info("Ignoring conn reset [age: $age]");
+                $diff = $this->config->reset_conn - $age;
+                \residue_internal\InternalLogger::info("Connection reset in {$diff}s (Age: {$age}s)");
             }
         }
 
@@ -363,7 +361,7 @@ class Residue
 
     private function now()
     {
-        return round(microtime(true));
+        return time();
     }
 
     private function validate_token($token)
@@ -465,6 +463,9 @@ class Residue
             "line" => $debug_trace[1]["line"],            
             "func" => count($debug_trace) > 2 ? $debug_trace[2]["function"] : ""
         );
+        if ($this->config->time_offset > 0) {
+            $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
+        }
         if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
             $req["token"] = $this->tokens[$logger_id]->token;
         }

@@ -23,10 +23,8 @@ Does not support following features at the moment
  * Unknown clients
  * Bulk requests
  * Compression (will require when bulk requests is done)
- * UTC time with log message
- * Time offset with log message
+ * Plain log request
  * Custom key size
- * Reset connection when server restarted or reset
 
 ## Config
 
@@ -36,7 +34,7 @@ Does not support following features at the moment
 | `access_codes`      | Object   | Array of access codes |
 | `application_id`      | String   | Application ID for `%app` format specifier |
 | `rsa_key_size`      | Number   | RSA key size (generated randomly) for unknown clients |
-| `utc_time`      | Boolean   | Use UTC time instead of local time (Optional) |
+| `time_offset`      | Number   | Log time offset (in seconds) |
 | `client_id`      | String   | Client ID that server knows this client as |
 | `client_private_key`      | String   | Full path of RSA private key |
 | `client_key_secret`      | String   | Secret (passphrase) for encrypted private key (if any) |
@@ -49,7 +47,7 @@ Does not support following features at the moment
 ### Sample Config
 ```
 {
-    "url": "residue-server:8777",
+    "url": "localhost:8777",
     "access_codes": [
         {
             "logger_id": "sample-app",
@@ -58,7 +56,6 @@ Does not support following features at the moment
     ],
     "application_id": "com.muflihun.residue.sampleapp",
     "rsa_key_size": 2048,
-    "utc_time": false,
     "time_offset": 0,
     "client_id": "muflihun00102030",
     "client_private_key": "keys/muflihun00102030.pem",
