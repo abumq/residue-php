@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.1]
+### Updates
+- Internal log to file (`<session_dir>/internal.log`) instead of console
+
 ## [1.0.0]
 ### Updates
 - Support `%thread`

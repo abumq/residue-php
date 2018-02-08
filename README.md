@@ -43,6 +43,7 @@ Does not support following features at the moment
 | `nc_bin`      | String   | Command to successfully run [nc](https://linux.die.net/man/1/nc) binary using user that will run your PHP script |
 | `session_dir`      | String   | Full path to empty directory for storing temporary objects by script (e.g, connection params, tokens etc) |
 | `reset_conn`      | Number   | Resets the connection and ignores objects in `session_dir` after these seconds |
+| `internal_log_file_limit` | Number | Maximum limit (in KB) for internal logging file (stored in `<session_dir>/internal.log`). Defaults to 2048 KB |
 
 ### Sample Config
 ```
@@ -64,7 +65,8 @@ Does not support following features at the moment
     "ripe_bin": "ripe",
     "nc_bin": "nc",
     "session_dir": "/tmp/resphp/",
-    "reset_conn": 120
+    "reset_conn": 120,
+    "internal_log_file_limit": 2048
 }
 ```
 ## Usage
