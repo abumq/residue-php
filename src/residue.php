@@ -10,7 +10,7 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 0.0.4+
+// Version: 1.0.0
 //
 
 namespace residue_internal;

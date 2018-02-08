@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - update version on residue.php
+## [1.0.0]
 ### Updates
 - Support `%thread`
 - printf like support
