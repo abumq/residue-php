@@ -3,6 +3,7 @@
 ## [Unreleased] - update version on residue.php
 ### Updates
 - Support `%thread`
+- printf like support
 
 ### Fixes
 - Fixed `%vlevel`

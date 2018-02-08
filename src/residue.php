@@ -18,7 +18,7 @@ namespace residue_internal;
 class InternalLogger 
 {
     private static $verbose_level = 0;
-    private static $new_line = "\n";
+    private static $new_line = PHP_EOL;
 
     public static function verbose($msg, $level)
     {
@@ -473,7 +473,7 @@ class Residue
         return "";
     }
 
-    public function write_log($logger_id, $msg, $level, $vlevel = 0)
+    private function write_log_internal($logger_id, $msg, $level, $vlevel = 0)
     {
         \residue_internal\InternalLogger::trace("write_log()");
         if (!$this->connected) {
@@ -511,9 +511,9 @@ class Residue
             "msg" => $msg,
             "app" => $this->config->application_id,
             "level" => $level,
-            "file" => $debug_trace[1]["file"],
-            "line" => $debug_trace[1]["line"],            
-            "func" => count($debug_trace) > 2 ? $debug_trace[2]["function"] : ""
+            "file" => $debug_trace[2]["file"],
+            "line" => $debug_trace[2]["line"],            
+            "func" => count($debug_trace) > 2 ? $debug_trace[3]["function"] : ""
         );
         if ($this->config->time_offset > 0) {
             $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
@@ -524,9 +524,50 @@ class Residue
         if ($vlevel > 0) {
             $req["vlevel"] = $vlevel;
         }
-        $req["thread"] = $this->build_thread_id();
+        $thread_id = $this->build_thread_id();
+        if (!empty($thread_id)) {
+            $req["thread"] = $thread_id;
+        }
         $request = $this->buildReq($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()} > /dev/null 2>/dev/null &");
+    }
+    
+    private function to_string_by_type($o)
+    {
+        switch (gettype($o)) {
+        case "boolean":
+            return $o ? "TRUE" : "FALSE";
+        case "array":
+            return json_encode($o);
+        case "NULL":
+            return "NULL";
+        case "string":
+            return $o;
+        case "integer":
+        case "double":
+            return (string)$o;
+        case "resource":
+        case "object":
+        default:
+            return serialize($o);
+        }
+    }
+
+    public function write_log($logger_id, $level, $vlevel, $format, ...$values)
+    {
+        $final_msg = "";
+        switch (gettype($format)) {
+        case "string":
+            foreach ($values as &$v) {
+                $v = $this->to_string_by_type($v);
+            }
+            $final_msg = sprintf($format, ...$values);
+            break;
+        default:
+            $final_msg = $this->to_string_by_type($format);
+            break;
+        }
+        $this->write_log_internal($logger_id, $final_msg, $level, $vlevel);
     }
 
     public function initialised()
@@ -557,45 +598,45 @@ class Logger
         }
     }
 
-    public function info($msg)
+    public function info($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Info);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Info, 0, $format, ...$values);
     }
 
-    public function warning($msg)
+    public function warning($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Warning);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Warning, 0, $format, ...$values);
     }
 
-    public function error($msg)
+    public function error($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Error);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Error, 0, $format, ...$values);
     }
 
-    public function debug($msg)
+    public function debug($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Debug);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Debug, 0, $format, ...$values);
     }
 
-    public function fatal($msg)
+    public function fatal($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Fatal);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Fatal, 0, $format, ...$values);
     }
 
-    public function trace($msg)
+    public function trace($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Trace);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Trace, 0, $format, ...$values);
     }
 
-    public function verbose($msg, $vlevel)
+    public function verbose($vlevel, $format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, $msg, \residue_internal\LoggingLevel::Verbose, $vlevel);
+        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Verbose, $vlevel, $format, ...$values);
     }
 }
