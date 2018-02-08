@@ -546,8 +546,9 @@ class Residue
         case "integer":
         case "double":
             return (string)$o;
-        case "resource":
         case "object":
+            return method_exists($o, '__toString') ? (string) $o : serialize($o);
+        case "resource":
         default:
             return serialize($o);
         }

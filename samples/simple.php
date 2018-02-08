@@ -12,6 +12,9 @@ $logger = new \residue\Logger("sample-app");
 class Car {
     public $engine;
     public $numberOfDoors;
+    public function __toString() { 
+        return "Car $this->engine with $this->numberOfDoors doors"; 
+    }
 }
 $myCar = new Car();
 $myCar->engine = 'V6 3.5';
