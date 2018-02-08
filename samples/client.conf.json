@@ -16,5 +16,6 @@
     "ripe_bin": "ripe",
     "nc_bin": "nc",
     "session_dir": "/tmp/resphp/",
-    "reset_conn": 120
+    "reset_conn": 120,
+    "internal_log_file_limit": 2048
 }

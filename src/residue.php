@@ -10,39 +10,10 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 1.0.0
+// Version: 1.0.1
 //
 
-namespace residue_internal;
-
-class InternalLogger 
-{
-    private static $verbose_level = 0;
-    private static $new_line = PHP_EOL;
-
-    public static function verbose($msg, $level)
-    {
-        if ($level <= InternalLogger::$verbose_level) {
-            echo $msg;
-            echo InternalLogger::$new_line;
-        }
-    }
-
-    public static function err($msg)
-    {
-        InternalLogger::verbose($msg, 1);
-    }
-
-    public static function trace($msg)
-    {
-        InternalLogger::verbose("trace: " . $msg, 9);
-    }
-
-    public static function info($msg)
-    {
-        InternalLogger::verbose("info:  " . $msg, 2);
-    }
-}
+namespace residue;
 
 abstract class LoggingLevel
 {
@@ -63,26 +34,22 @@ abstract class Flag
     const ALLOW_DEFAULT_ACCESS_CODE = 4;
 }
 
-namespace residue;
-
 class Residue 
 {
     const TOUCH_THRESHOLD = 60;
-
+    
     private $config_file = null;
     protected static $_instance;
 
     public static function init($config_file = null)
     {
-        \residue_internal\InternalLogger::trace("init()");
         if (!(self::$_instance instanceof self)) {
             self::$_instance = new self();
-            \residue_internal\InternalLogger::info("New residue instance");
             if ($config_file !== null) {
                 self::$_instance->init_connection($config_file);
             }
         }
-        \residue_internal\InternalLogger::info(self::$_instance === null ? "Residue: Null" : "Residue: Obj");
+        self::$_instance->internal_log_info(self::$_instance === null ? "Residue: Null" : "Residue: Obj");
         return self::$_instance;
     }
 
@@ -95,18 +62,47 @@ class Residue
     {
     }
 
+    ////////////////////////////// internal logging ////////////////////////////////////
+    private static $internal_log_verbose_level = 9;
+    
+    public function internal_log_verbose($msg, $level)
+    {
+        if ($this->config != null && is_writable($this->config->internal_log_file)) {
+            if ($level <= Residue::$internal_log_verbose_level) {
+                file_put_contents($this->config->internal_log_file, date("Y-m-d H:i:s") . " " . $msg . PHP_EOL, FILE_APPEND | LOCK_EX);
+            }
+        }
+    }
+
+    public function internal_log_err($msg)
+    {
+        $this->internal_log_verbose($msg, 1);
+    }
+
+    public function internal_log_trace($msg)
+    {
+        $this->internal_log_verbose("trace: " . $msg, 9);
+    }
+
+    public function internal_log_info($msg)
+    {
+        $this->internal_log_verbose("info:  " . $msg, 2);
+    }
+    
+    ////////////////////////////// end - internal logging ////////////////////////////////////
+
     private function init_connection($config_file)
     {
-        \residue_internal\InternalLogger::trace("init_connection()");
+        $this->internal_log_trace("init_connection()");
         $this->config_file = $config_file;
         $this->config = json_decode(file_get_contents($config_file));
         if (!file_exists($this->config->session_dir)) {
             if (!mkdir($this->config->session_dir , 0777, true)) {
-                \residue_internal\InternalLogger::err("[{$this->config->session_dir}] is not writable");
+                $this->internal_log_err("[{$this->config->session_dir}] is not writable");
                 return false;
             }
         } else if (!is_writable($this->config->session_dir)) {
-            \residue_internal\InternalLogger::err("[{$this->config->session_dir}] is not writable");
+            $this->internal_log_err("[{$this->config->session_dir}] is not writable");
             return false;
         }
 
@@ -119,12 +115,29 @@ class Residue
         $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
         $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
         $this->config->connection_lock_file = $this->config->session_dir . "/conn.lock";
+        $this->config->internal_log_file = $this->config->session_dir . "/internal.log";
+        
+        if (!property_exists($this->config, "internal_log_file_limit")) {
+            $this->config->internal_log_file_limit = 2048 * 1024;
+        } else {
+            $this->config->internal_log_file_limit *= 1024;
+        }
+        
+        if (file_exists($this->config->internal_log_file) 
+                && filesize($this->config->internal_log_file) > $this->config->internal_log_file_limit) {
+            unlink($this->config->internal_log_file);
+            touch($this->config->internal_log_file);
+            chmod($this->config->internal_log_file, 0777);
+        } else {
+            touch($this->config->internal_log_file);
+            chmod($this->config->internal_log_file, 0777);
+        }
         
         $sleepingFor = 0;
         while ($this->locked()) {
             sleep(1);
             if ($sleepingFor++ >= 5) {
-                \residue_internal\InternalLogger::info("Unlocking manually");
+                $this->internal_log_info("Unlocking manually");
                 $this->unlock();
             }
         }
@@ -134,23 +147,23 @@ class Residue
             $mt = intval(file_get_contents($this->config->connection_mtime_file));
             $age = $this->now() - $mt;
             if ($age >= $this->config->reset_conn) {
-                \residue_internal\InternalLogger::info("Resetting connection");
+                $this->internal_log_info("Resetting connection");
                 unlink($this->config->connection_file);
                 unlink($this->config->connection_mtime_file);
                 $this->delete_all_tokens();
             } else {
                 $diff = $this->config->reset_conn - $age;
-                \residue_internal\InternalLogger::info("Connection reset in {$diff}s (Age: {$age}s)");
+                $this->internal_log_info("Connection reset in {$diff}s (Age: {$age}s)");
             }
         }
 
         if (!file_exists($this->config->tokens_dir)) {
             if (!mkdir($this->config->tokens_dir , 0777, true)) {
-                \residue_internal\InternalLogger::err("Failed to create directory [{$this->config->tokens_dir}]");
+                $this->internal_log_err("Failed to create directory [{$this->config->tokens_dir}]");
                 return false;
             }
         } else if (!is_writable($this->config->tokens_dir)) {
-            \residue_internal\InternalLogger::err("[{$this->config->tokens_dir}] is not writable");
+            $this->internal_log_err("[{$this->config->tokens_dir}] is not writable");
             return false;
         }
 
@@ -161,7 +174,7 @@ class Residue
             $this->tokens = array();
             $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
         }
-        \residue_internal\InternalLogger::info($this->connected === true ? "Successfully connected" : "Failed to connect");
+        $this->internal_log_info($this->connected === true ? "Successfully connected" : "Failed to connect");
 
         return true;
     }
@@ -271,7 +284,7 @@ class Residue
     private function connect()
     {
         $this->lock();
-        \residue_internal\InternalLogger::trace("connect()");
+        $this->internal_log_trace("connect()");
         $this->reset();
 
         $req = array(
@@ -300,7 +313,7 @@ class Residue
 
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
-            \residue_internal\InternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            $this->internal_log_err("{$plain_json->error_text}, status: {$plain_json->status}");
             $this->unlock();
             return false;
         }
@@ -318,7 +331,7 @@ class Residue
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc()}");
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
-            \residue_internal\InternalLogger::err("{$plain_json->error_text}, status: {$plain_json->status}");
+            $this->internal_log_err("{$plain_json->error_text}, status: {$plain_json->status}");
             $this->unlock();
             return false;
         }
@@ -336,7 +349,7 @@ class Residue
 
     private function delete_all_tokens()
     {
-        \residue_internal\InternalLogger::trace("delete_all_tokens()");
+        $this->internal_log_trace("delete_all_tokens()");
         if (file_exists($this->config->tokens_dir)) {
             array_map('unlink', glob("{$this->config->tokens_dir}/*"));
         }
@@ -344,7 +357,7 @@ class Residue
 
     private function touch()
     {
-        \residue_internal\InternalLogger::trace("touch()");
+        $this->internal_log_trace("touch()");
         $this->lock();
         if (!$this->connected) {
             $this->connect();
@@ -362,7 +375,7 @@ class Residue
         $decrypted_result = $this->decrypt($result);
         $decoded = json_decode($decrypted_result);
         if ($decoded !== null && !empty($decoded->error_text)) {
-            \residue_internal\InternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            $this->internal_log_err("{$decoded->error_text}, status: {$decoded->status}");
             $this->unlock();
             return false;
         }
@@ -377,7 +390,7 @@ class Residue
 
     private function validate_connection()
     {
-        \residue_internal\InternalLogger::trace("validate_connection()");
+        $this->internal_log_trace("validate_connection()");
         if ($this->connection === null) {
             return false;
         }
@@ -386,7 +399,7 @@ class Residue
 
     private function should_touch()
     {
-        \residue_internal\InternalLogger::trace("should_touch()");
+        $this->internal_log_trace("should_touch()");
         if ($this->connection === null || $this->connection->age === 0) {
             return false;
         }
@@ -400,9 +413,9 @@ class Residue
 
     private function validate_token($token)
     {
-        \residue_internal\InternalLogger::trace("validate_token()");
-        if (!$this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
-            \residue_internal\InternalLogger::info("no token required");
+        $this->internal_log_trace("validate_token()");
+        if (!$this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
+            $this->internal_log_info("no token required");
             return true;
         }
         return $token !== null && ($token->life === 0 || $this->now() - $token->date_created < $token->life);
@@ -411,7 +424,7 @@ class Residue
     private function obtain_token($logger_id, $access_code)
     {
         $this->lock();
-        \residue_internal\InternalLogger::trace("obtain_token()");
+        $this->internal_log_trace("obtain_token()");
         $req = array(
             "_t" => $this->now(),
             "logger_id" => $logger_id,
@@ -422,7 +435,7 @@ class Residue
         $decrypted_result = $this->decrypt($result);
         $decoded = json_decode($decrypted_result);
         if ($decoded !== null && !empty($decoded->error_text)) {
-            \residue_internal\InternalLogger::err("{$decoded->error_text}, status: {$decoded->status}");
+            $this->internal_log_err("{$decoded->error_text}, status: {$decoded->status}");
             $this->unlock();
             return false;
         }
@@ -435,7 +448,7 @@ class Residue
 
     private function update_token($logger_id)
     {
-        \residue_internal\InternalLogger::trace("update_token()");
+        $this->internal_log_trace("update_token()");
         $this->tokens[$logger_id] = null;
         if (file_exists($this->config->tokens_dir . $logger_id)) {
             $token_info = json_decode(file_get_contents($this->config->tokens_dir . $logger_id));
@@ -449,7 +462,7 @@ class Residue
 
     private function read_access_code($logger_id)
     {
-        \residue_internal\InternalLogger::trace("read_access_code()");
+        $this->internal_log_trace("read_access_code()");
         foreach ($this->config->access_codes as &$ac) {
             if ($ac->logger_id === $logger_id) {
                 return $ac->code;
@@ -474,32 +487,32 @@ class Residue
         return "";
     }
 
-    private function write_log_internal($logger_id, $msg, $level, $vlevel = 0)
+    private function write_formatted_log($logger_id, $msg, $level, $vlevel = 0)
     {
-        \residue_internal\InternalLogger::trace("write_log()");
+        $this->internal_log_trace("write_log()");
         if (!$this->connected) {
-            \residue_internal\InternalLogger::info("no connection");
+            $this->internal_log_info("no connection");
             $this->connect();
         }
         if (!$this->validate_connection()) {
-            \residue_internal\InternalLogger::info("connection expired");
+            $this->internal_log_info("connection expired");
             $this->connected = false;
             $this->connect();
         }
         if ($this->should_touch()) {
-            \residue_internal\InternalLogger::info("connection should be touched");
+            $this->internal_log_info("connection should be touched");
             $this->touch();
         }
-        if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
+        if ($this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
             if (array_key_exists($logger_id, $this->tokens)) {
                 if (!$this->validate_token($this->tokens[$logger_id])) {
-                    \residue_internal\InternalLogger::info("token expired (memory)");
+                    $this->internal_log_info("token expired (memory)");
                     $this->obtain_token($logger_id, $this->read_access_code($logger_id));
                 }
             } else {
                 $this->update_token($logger_id);
                 if (!$this->validate_token($this->tokens[$logger_id])) {
-                    \residue_internal\InternalLogger::info("token expired");
+                    $this->internal_log_info("token expired");
                     $this->obtain_token($logger_id, $this->read_access_code($logger_id));
                 }
             }
@@ -519,7 +532,7 @@ class Residue
         if ($this->config->time_offset > 0) {
             $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
         }
-        if ($this->has_flag(\residue_internal\Flag::REQUIRES_TOKEN)) {
+        if ($this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
             $req["token"] = $this->tokens[$logger_id]->token;
         }
         if ($vlevel > 0) {
@@ -557,19 +570,19 @@ class Residue
 
     public function write_log($logger_id, $level, $vlevel, $format, ...$values)
     {
-        $final_msg = "";
+        $formatted_msg = "";
         switch (gettype($format)) {
         case "string":
             foreach ($values as &$v) {
                 $v = $this->to_string_by_type($v);
             }
-            $final_msg = sprintf($format, ...$values);
+            $formatted_msg = sprintf($format, ...$values);
             break;
         default:
-            $final_msg = $this->to_string_by_type($format);
+            $formatted_msg = $this->to_string_by_type($format);
             break;
         }
-        $this->write_log_internal($logger_id, $final_msg, $level, $vlevel);
+        $this->write_formatted_log($logger_id, $formatted_msg, $level, $vlevel);
     }
 
     public function initialised()
@@ -586,8 +599,6 @@ class Logger
 
     public function __construct($logger_id = "default")
     {
-        \residue_internal\InternalLogger::trace("new Logger()");
-
         $this->logger_id = $logger_id;
 
         $residue_instance = Residue::init();
@@ -596,49 +607,49 @@ class Logger
             $this->residue_instance = $residue_instance;
             $this->is_ready = true;
         } else {
-            \residue_internal\InternalLogger::err("Residue not initialised. You must initialise the residue instance before you can use ResidueLogger");
+            throw new Exception("Residue not initialised. You must initialise the residue instance with configurations before you can use residue\Logger");
         }
     }
 
     public function info($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Info, 0, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Info, 0, $format, ...$values);
     }
 
     public function warning($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Warning, 0, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Warning, 0, $format, ...$values);
     }
 
     public function error($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Error, 0, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Error, 0, $format, ...$values);
     }
 
     public function debug($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Debug, 0, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Debug, 0, $format, ...$values);
     }
 
     public function fatal($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Fatal, 0, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Fatal, 0, $format, ...$values);
     }
 
     public function trace($format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Trace, 0, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Trace, 0, $format, ...$values);
     }
 
     public function verbose($vlevel, $format, ...$values)
     {
         if (!$this->is_ready) return;
-        $this->residue_instance->write_log($this->logger_id, \residue_internal\LoggingLevel::Verbose, $vlevel, $format, ...$values);
+        $this->residue_instance->write_log($this->logger_id, \residue\LoggingLevel::Verbose, $vlevel, $format, ...$values);
     }
 }
