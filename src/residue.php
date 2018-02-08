@@ -93,7 +93,6 @@ class Residue
 
     private function __construct()
     {
-
     }
 
     private function init_connection($config_file)
@@ -468,7 +467,9 @@ class Residue
             if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
                 return $_SERVER['HTTP_X_FORWARDED_FOR'];
             }
-            return $_SERVER['REMOTE_ADDR'];
+            if (!empty($_SERVER['REMOVE_ADDR'])) {
+                return $_SERVER['REMOTE_ADDR'];
+	    }
         }
         return "";
     }
@@ -503,7 +504,7 @@ class Residue
                 }
             }
         }
-        $debug_trace = &debug_backtrace();
+        $debug_trace = debug_backtrace();
         $req = array(
             "_t" => $this->now(),
             "datetime" => $this->now() * 1000,
@@ -513,7 +514,7 @@ class Residue
             "level" => $level,
             "file" => $debug_trace[2]["file"],
             "line" => $debug_trace[2]["line"],            
-            "func" => count($debug_trace) > 2 ? $debug_trace[3]["function"] : ""
+            "func" => count($debug_trace) > 3 ? $debug_trace[3]["function"] : ""
         );
         if ($this->config->time_offset > 0) {
             $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
