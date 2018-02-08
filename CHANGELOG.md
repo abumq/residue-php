@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0]
+### Updates
+- Support `%thread`
+- printf like support
+
+### Fixes
+- Fixed `%vlevel`
+
 ## [0.0.4]
 ### Updates
 - Lock while connecting
