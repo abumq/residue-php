@@ -54,7 +54,7 @@ Does not support following features at the moment
             "code": "a2dcb"
         }
     ],
-    "application_id": "com.muflihun.residue.sampleapp",
+    "application_id": "com.muflihun.residue.php.sampleapp",
     "rsa_key_size": 2048,
     "time_offset": 0,
     "client_id": "muflihun00102030",
@@ -66,4 +66,52 @@ Does not support following features at the moment
     "session_dir": "/tmp/resphp/",
     "reset_conn": 120
 }
+```
+## Usage
+```
+// initialize only once in the beginning of the script
+\residue\Residue::init("client.conf.json");
+
+$logger = new \residue\Logger("sample-app");
+
+
+$logger->debug("another");
+
+// array
+$logger->info([1, 2]);
+
+// object
+$logger->info("blah %s this", $myCar);
+
+// number
+$logger->info(1234);
+$logger->info(1234.233);
+
+// formatted (see http://php.net/manual/en/function.sprintf.php)
+$logger->info("test %s %s", 1, 2);
+
+
+// verbose log
+$logger->verbose(9, "this is msg %d ---", 123);
+
+```
+
+## License
+```
+Copyright 2017-present Muflihun Labs
+
+https://github.com/muflihun/
+https://muflihun.com
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 ```
