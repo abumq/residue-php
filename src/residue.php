@@ -63,30 +63,35 @@ class Residue
     }
 
     ////////////////////////////// internal logging ////////////////////////////////////
-    private static $internal_log_verbose_level = 9;
+    private static $internal_log_verbose_level = 2;
     
     public function internal_log_verbose($msg, $level)
     {
-        if ($this->config != null && is_writable($this->config->internal_log_file)) {
+        if ($this->config != null && property_exists($this->config, "internal_log_file") && is_writable($this->config->internal_log_file)) {
             if ($level <= Residue::$internal_log_verbose_level) {
-                file_put_contents($this->config->internal_log_file, date("Y-m-d H:i:s") . " " . $msg . PHP_EOL, FILE_APPEND | LOCK_EX);
+                file_put_contents($this->config->internal_log_file, date("Y-m-d H:i:s") . " " . $this->to_string_by_type($msg) . PHP_EOL, FILE_APPEND | LOCK_EX);
             }
         }
     }
 
     public function internal_log_err($msg)
     {
-        $this->internal_log_verbose($msg, 1);
+        $this->internal_log_verbose("error: " . $this->to_string_by_type($msg), 1);
     }
 
     public function internal_log_trace($msg)
     {
-        $this->internal_log_verbose("trace: " . $msg, 9);
+        $this->internal_log_verbose("trace: " . $this->to_string_by_type($msg), 6);
     }
 
     public function internal_log_info($msg)
     {
-        $this->internal_log_verbose("info:  " . $msg, 2);
+        $this->internal_log_verbose("info:  " . $this->to_string_by_type($msg), 2);
+    }
+
+    public function internal_log_debug($msg)
+    {
+        $this->internal_log_verbose("info:  " . $this->to_string_by_type($msg), 8);
     }
     
     ////////////////////////////// end - internal logging ////////////////////////////////////
@@ -122,16 +127,14 @@ class Residue
         } else {
             $this->config->internal_log_file_limit *= 1024;
         }
+
+        $this->internal_log_info("init by " . get_current_user());
         
         if (file_exists($this->config->internal_log_file) 
                 && filesize($this->config->internal_log_file) > $this->config->internal_log_file_limit) {
             unlink($this->config->internal_log_file);
-            touch($this->config->internal_log_file);
-            chmod($this->config->internal_log_file, 0777);
-        } else {
-            touch($this->config->internal_log_file);
-            chmod($this->config->internal_log_file, 0777);
         }
+        $this->create_empty_file($this->config->internal_log_file);
         
         $sleepingFor = 0;
         while ($this->locked()) {
@@ -207,7 +210,7 @@ class Residue
 
     private function update_connection()
     {
-        if (file_exists($this->config->connection_file)) {
+        if (file_exists($this->config->connection_file) && filesize($this->config->connection_file) > 0) {
             $this->connection = json_decode(file_get_contents($this->config->connection_file));
         } else {
             $this->connection = null;
@@ -218,13 +221,17 @@ class Residue
     {
         switch ($method) {
             case 1:
-                return shell_exec("echo '$enc' | {$this->config->ripe_bin} -d --key {$this->connection->key} --base64");
+                $cmd = ("echo '$enc' | {$this->config->ripe_bin} -d --key {$this->connection->key} --base64");
+                $this->internal_log_debug("decr cmd: $cmd");
+                return shell_exec($cmd);
             case 2:
                 $client_secret_param = "";
                 if (!empty($this->config->client_key_secret)) {
                    $client_secret_param = " --secret {$this->config->client_key_secret} ";
                 }
-                return shell_exec("echo '$enc' | {$this->config->ripe_bin} -d --rsa --clean --in-key {$this->config->private_key_file} $client_secret_param --base64");
+                $cmd = ("echo '$enc' | {$this->config->ripe_bin} -d --rsa --clean --in-key {$this->config->private_key_file} $client_secret_param --base64");
+                $this->internal_log_debug("decr cmd: $cmd");
+                return shell_exec($cmd);
                 break;
             default:
                 return null;
@@ -281,6 +288,13 @@ class Residue
         $this->tokens = array();
     }
 
+    private function create_empty_file($file)
+    {
+        if (file_exists($file)) return;
+        touch($file);
+        chmod($file, 0777);
+    }
+
     private function connect()
     {
         $this->lock();
@@ -300,7 +314,8 @@ class Residue
         }
 
         // save private key
-        file_put_contents($this->config->private_key_file, $private_key_contents);
+        $this->create_empty_file($this->config->private_key_file);
+        file_put_contents($this->config->private_key_file, $private_key_contents, LOCK_EX);
 
         $request = $this->buildReq($req);
 
@@ -317,8 +332,11 @@ class Residue
             $this->unlock();
             return false;
         }
-        file_put_contents($this->config->connection_file, $this->decrypt($result, 2));
-        file_put_contents($this->config->connection_mtime_file, $this->now());
+        $this->create_empty_file($this->config->connection_file);
+        $this->create_empty_file($this->config->connection_mtime_file);
+        $this->internal_log_info("result: $result");
+        file_put_contents($this->config->connection_file, $this->decrypt($result, 2), LOCK_EX);
+        file_put_contents($this->config->connection_mtime_file, $this->now(), LOCK_EX);
         $this->update_connection();
         
         // acknowledge
@@ -335,8 +353,8 @@ class Residue
             $this->unlock();
             return false;
         }
-        file_put_contents($this->config->connection_file, $this->decrypt($result));
-        file_put_contents($this->config->connection_mtime_file, $this->now());
+        file_put_contents($this->config->connection_file, $this->decrypt($result), LOCK_EX);
+        file_put_contents($this->config->connection_mtime_file, $this->now(), LOCK_EX);
 
         $this->update_connection();
 
@@ -379,7 +397,8 @@ class Residue
             $this->unlock();
             return false;
         }
-        file_put_contents($this->config->connection_file, $decrypted_result);
+        $this->create_empty_file($this->config->connection_file);
+        file_put_contents($this->config->connection_file, $decrypted_result, LOCK_EX);
         $this->update_connection();
         $this->delete_all_tokens();
 
@@ -438,10 +457,16 @@ class Residue
             $this->internal_log_err("{$decoded->error_text}, status: {$decoded->status}");
             $this->unlock();
             return false;
+        } else if ($decoded === null) {
+            $this->internal_log_err("Decoding response failed {$result}");
+            $this->unlock();
+            return false;
         }
         $decoded->date_created = $this->now();
         $final = json_encode($decoded);
-        file_put_contents($this->config->tokens_dir . $logger_id, $final);
+        $token_file = $this->config->tokens_dir . $logger_id;
+        $this->create_empty_file($token_file);
+        file_put_contents($token_file, $final, LOCK_EX);
         $this->update_token($logger_id);
         $this->unlock();
     }
@@ -450,7 +475,8 @@ class Residue
     {
         $this->internal_log_trace("update_token()");
         $this->tokens[$logger_id] = null;
-        if (file_exists($this->config->tokens_dir . $logger_id)) {
+        $token_file = $this->config->tokens_dir . $logger_id;
+        if (file_exists($token_file) && filesize($token_file) > 0) {
             $token_info = json_decode(file_get_contents($this->config->tokens_dir . $logger_id));
             $this->tokens[$logger_id] = json_decode(json_encode(array(
                 "token" => $token_info->token, 
@@ -482,7 +508,7 @@ class Residue
             }
             if (!empty($_SERVER['REMOVE_ADDR'])) {
                 return $_SERVER['REMOTE_ADDR'];
-	    }
+        }
         }
         return "";
     }
@@ -517,6 +543,7 @@ class Residue
                 }
             }
         }
+        $this->internal_log_info("building request");
         $debug_trace = debug_backtrace();
         $req = array(
             "_t" => $this->now(),
@@ -549,22 +576,22 @@ class Residue
     private function to_string_by_type($o)
     {
         switch (gettype($o)) {
-        case "boolean":
-            return $o ? "TRUE" : "FALSE";
-        case "array":
-            return json_encode($o);
-        case "NULL":
-            return "NULL";
-        case "string":
-            return $o;
-        case "integer":
-        case "double":
-            return (string)$o;
-        case "object":
-            return method_exists($o, '__toString') ? (string) $o : serialize($o);
-        case "resource":
-        default:
-            return serialize($o);
+            case "boolean":
+                return $o ? "TRUE" : "FALSE";
+            case "array":
+                return json_encode($o);
+            case "NULL":
+                return "NULL";
+            case "string":
+                return $o;
+            case "integer":
+            case "double":
+                return (string)$o;
+            case "object":
+                return method_exists($o, '__toString') ? (string) $o : serialize($o);
+            case "resource":
+            default:
+                return serialize($o);
         }
     }
 
@@ -572,15 +599,15 @@ class Residue
     {
         $formatted_msg = "";
         switch (gettype($format)) {
-        case "string":
-            foreach ($values as &$v) {
-                $v = $this->to_string_by_type($v);
-            }
-            $formatted_msg = sprintf($format, ...$values);
-            break;
-        default:
-            $formatted_msg = $this->to_string_by_type($format);
-            break;
+            case "string":
+                foreach ($values as &$v) {
+                    $v = $this->to_string_by_type($v);
+                }
+                $formatted_msg = sprintf($format, ...$values);
+                break;
+            default:
+                $formatted_msg = $this->to_string_by_type($format);
+                break;
         }
         $this->write_formatted_log($logger_id, $formatted_msg, $level, $vlevel);
     }
