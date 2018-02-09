@@ -134,7 +134,7 @@ class Residue
                 && filesize($this->config->internal_log_file) > $this->config->internal_log_file_limit) {
             unlink($this->config->internal_log_file);
         }
-    $this->create_empty_file($this->config->internal_log_file);
+        $this->create_empty_file($this->config->internal_log_file);
         
         $sleepingFor = 0;
         while ($this->locked()) {
@@ -458,14 +458,14 @@ class Residue
             $this->unlock();
             return false;
         } else if ($decoded === null) {
-        $this->internal_log_err("Decoding response failed {$result}");
+            $this->internal_log_err("Decoding response failed {$result}");
             $this->unlock();
-        return false;
-    }
+            return false;
+        }
         $decoded->date_created = $this->now();
         $final = json_encode($decoded);
-    $token_file = $this->config->tokens_dir . $logger_id;
-    $this->create_empty_file($token_file);
+        $token_file = $this->config->tokens_dir . $logger_id;
+        $this->create_empty_file($token_file);
         file_put_contents($token_file, $final, LOCK_EX);
         $this->update_token($logger_id);
         $this->unlock();
@@ -474,8 +474,8 @@ class Residue
     private function update_token($logger_id)
     {
         $this->internal_log_trace("update_token()");
-    $this->tokens[$logger_id] = null;
-    $token_file = $this->config->tokens_dir . $logger_id;
+        $this->tokens[$logger_id] = null;
+        $token_file = $this->config->tokens_dir . $logger_id;
         if (file_exists($token_file) && filesize($token_file) > 0) {
             $token_info = json_decode(file_get_contents($this->config->tokens_dir . $logger_id));
             $this->tokens[$logger_id] = json_decode(json_encode(array(
