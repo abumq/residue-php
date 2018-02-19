@@ -62,6 +62,16 @@ class Residue
     {
     }
 
+    public function __destruct ()
+    {
+        $this->flush();
+    }
+
+
+    public function flush()
+    {
+    }
+
     ////////////////////////////// internal logging ////////////////////////////////////
     private static $internal_log_verbose_level = 2;
     

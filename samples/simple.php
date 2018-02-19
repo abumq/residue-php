@@ -44,3 +44,5 @@ $logger->info("test %s %s", 1, 2);
 
 // verbose log
 $logger->verbose(9, "this is msg %d ---", 123);
+
+echo "last msg\n";
