@@ -98,6 +98,7 @@ $logger->verbose(9, "this is msg %d ---", 123);
 ## License
 ```
 Copyright 2017-present Muflihun Labs
+Copyright 2017-present @abumusamq
 
 https://github.com/muflihun/
 https://muflihun.com
