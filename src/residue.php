@@ -75,7 +75,7 @@ class Residue
     public function flush_all()
     {
         $this->internal_log_trace('flush_all()');
-        $this->fwd_request($this->backlog);
+        $this->fwd_request($this->backlog, true);
         $this->backlog = array();
     }
 
@@ -566,7 +566,7 @@ class Residue
         }
     }
 
-    private function fwd_request($req)
+    private function fwd_request($req, $is_from_backlog)
     {
         if (!$this->validate_connection()) {
             $this->internal_log_info("connection expired");
@@ -578,7 +578,7 @@ class Residue
             $this->touch();
         }
         if ($this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
-            if (is_array($req)) {
+            if ($is_from_backlog) {
                 $this->last_fwd_check = $this->now();
                 foreach ($req as &$r) {
                     // note: requests have logger instead of logger_id
@@ -633,12 +633,12 @@ class Residue
         if ($this->has_flag(\residue\Flag::ALLOW_BULK_LOG_REQUEST)) {
             array_push($this->backlog, $req);
             if ($this->should_fwd()) {
-                $this->fwd_request($this->backlog);
+                $this->fwd_request($this->backlog, true);
                 $this->backlog = array();
             }
             $last_fwd_check = $this->now();
         } else {
-            $this->fwd_request($req);
+            $this->fwd_request($req, false);
         }
     }
     
