@@ -32,6 +32,8 @@ abstract class Flag
     const ALLOW_UNKNOWN_LOGGERS = 1;
     const REQUIRES_TOKEN = 2;
     const ALLOW_DEFAULT_ACCESS_CODE = 4;
+    const ALLOW_BULK_LOG_REQUEST = 16;
+    const COMPRESSION = 256; 
 }
 
 class Residue 
@@ -39,6 +41,8 @@ class Residue
     const TOUCH_THRESHOLD = 60;
     
     private $config_file = null;
+    private $backlog = array();
+    private $last_fwd_check = null;
     protected static $_instance;
 
     public static function init($config_file = null)
@@ -60,6 +64,19 @@ class Residue
 
     private function __construct()
     {
+    }
+
+    public function __destruct()
+    {
+        $this->internal_log_trace('destruct()');
+        $this->flush_all();
+    }
+
+    public function flush_all()
+    {
+        $this->internal_log_trace('flush_all()');
+        $this->fwd_request($this->backlog);
+        $this->backlog = array();
     }
 
     ////////////////////////////// internal logging ////////////////////////////////////
@@ -199,7 +216,7 @@ class Residue
         touch($this->config->connection_lock_file);
     }
 
-    private function buildReq($req_obj, $is_b64 = false)
+    private function build_req($req_obj, $is_b64 = false)
     {
         $enc = json_encode($req_obj);
         if ($is_b64) {
@@ -268,9 +285,15 @@ class Residue
         return "{$this->build_ripe()} | {$this->build_nc_token()}";
     }
 
-    private function build_ripe_nc_logging()
+    private function build_ripe_nc_logging($compress = false)
     {
-        return "{$this->build_ripe()} | {$this->build_nc_logging()}";
+        $r = "";
+        if ($compress) {
+            $r .= " {$this->config->ripe_bin} -e --zlib --base64 | ";
+        }
+        $r .= $this->build_ripe();
+        $r .= " | {$this->build_nc_logging()}";
+        return $r;
     }
 
     private function has_flag($f)
@@ -308,6 +331,7 @@ class Residue
         $private_key_contents = "";
         if (empty($this->config->client_id) || empty($this->config->client_private_key)) {
             // generate RSA key
+            throw new Exception("Unknown clients are not supported by PHP client for residue");
         } else {
             $req["client_id"] = $this->config->client_id;
             $private_key_contents = file_get_contents($this->config->client_private_key);
@@ -317,7 +341,7 @@ class Residue
         $this->create_empty_file($this->config->private_key_file);
         file_put_contents($this->config->private_key_file, $private_key_contents, LOCK_EX);
 
-        $request = $this->buildReq($req);
+        $request = $this->build_req($req);
 
         $server_encrypt_param = "";
         if (!empty($this->config->server_public_key)) {
@@ -345,7 +369,7 @@ class Residue
             "client_id" => $this->connection->client_id,
             "type" => 2 // ACK
         );
-        $request = $this->buildReq($req);
+        $request = $this->build_req($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc()}");
         $plain_json = json_decode($result);
         if ($plain_json !== null) {
@@ -388,7 +412,7 @@ class Residue
             "client_id" => $this->connection->client_id,
             "type" => 3
         );
-        $request = $this->buildReq($req);
+        $request = $this->build_req($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc()}");
         $decrypted_result = $this->decrypt($result);
         $decoded = json_decode($decrypted_result);
@@ -449,7 +473,7 @@ class Residue
             "logger_id" => $logger_id,
             "access_code" => $access_code
         );
-        $request = $this->buildReq($req);
+        $request = $this->build_req($req);
         $result = shell_exec("echo '$request' | {$this->build_ripe_nc_token()}");
         $decrypted_result = $this->decrypt($result);
         $decoded = json_decode($decrypted_result);
@@ -513,13 +537,37 @@ class Residue
         return "";
     }
 
-    private function write_formatted_log($logger_id, $msg, $level, $vlevel = 0)
+    private function should_fwd()
     {
-        $this->internal_log_trace("write_log()");
-        if (!$this->connected) {
-            $this->internal_log_info("no connection");
-            $this->connect();
+        if ($this->last_fwd_check === null) {
+            return false;
         }
+        if ($this->last_fwd_check > $this->now() + 5) {
+            // not forwarded in 3 seconds might as well forward it
+            return true;
+        }
+        return count($this->backlog) >= $this->connection->max_bulk_size;
+    }
+
+    private function validate_or_obtainToken($logger_id)
+    {
+        // this function assumes REQUIRES_TOKEN flag is ON
+        if (array_key_exists($logger_id, $this->tokens)) {
+            if (!$this->validate_token($this->tokens[$logger_id])) {
+                $this->internal_log_info("token expired (memory)");
+                $this->obtain_token($logger_id, $this->read_access_code($logger_id));
+            }
+        } else {
+            $this->update_token($logger_id);
+            if (!$this->validate_token($this->tokens[$logger_id])) {
+                $this->internal_log_info("token expired");
+                $this->obtain_token($logger_id, $this->read_access_code($logger_id));
+            }
+        }
+    }
+
+    private function fwd_request($req)
+    {
         if (!$this->validate_connection()) {
             $this->internal_log_info("connection expired");
             $this->connected = false;
@@ -530,20 +578,36 @@ class Residue
             $this->touch();
         }
         if ($this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
-            if (array_key_exists($logger_id, $this->tokens)) {
-                if (!$this->validate_token($this->tokens[$logger_id])) {
-                    $this->internal_log_info("token expired (memory)");
-                    $this->obtain_token($logger_id, $this->read_access_code($logger_id));
+            if (is_array($req)) {
+                $this->last_fwd_check = $this->now();
+                foreach ($req as &$r) {
+                    // note: requests have logger instead of logger_id
+                    $this->validate_or_obtainToken($r["logger"]);
+                    $r["token"] = $this->tokens[$r["logger"]]->token;
                 }
             } else {
-                $this->update_token($logger_id);
-                if (!$this->validate_token($this->tokens[$logger_id])) {
-                    $this->internal_log_info("token expired");
-                    $this->obtain_token($logger_id, $this->read_access_code($logger_id));
-                }
+                $this->validate_or_obtainToken($req["logger"]);
+                $req["token"] = $this->tokens[$req["logger"]]->token;
             }
+            
         }
-        $this->internal_log_info("building request");
+        $request = $this->build_req($req);
+
+        $ripe_with_possible_compression = $this->build_ripe_nc_logging($this->has_flag(\residue\Flag::COMPRESSION));
+        $this->internal_log_debug("ripe: echo '$request' | $ripe_with_possible_compression");
+
+        $result = shell_exec("echo '$request' | $ripe_with_possible_compression > /dev/null 2>/dev/null &");
+    }
+
+    private function write_formatted_log($logger_id, $msg, $level, $vlevel = 0)
+    {
+        $this->internal_log_trace("write_formatted_log()");
+        if (!$this->connected) {
+            $this->internal_log_info("no connection");
+            $this->connect();
+        }
+
+        $this->internal_log_debug("building request");
         $debug_trace = debug_backtrace();
         $req = array(
             "_t" => $this->now(),
@@ -559,9 +623,6 @@ class Residue
         if ($this->config->time_offset > 0) {
             $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
         }
-        if ($this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
-            $req["token"] = $this->tokens[$logger_id]->token;
-        }
         if ($vlevel > 0) {
             $req["vlevel"] = $vlevel;
         }
@@ -569,8 +630,16 @@ class Residue
         if (!empty($thread_id)) {
             $req["thread"] = $thread_id;
         }
-        $request = $this->buildReq($req);
-        $result = shell_exec("echo '$request' | {$this->build_ripe_nc_logging()} > /dev/null 2>/dev/null &");
+        if ($this->has_flag(\residue\Flag::ALLOW_BULK_LOG_REQUEST)) {
+            array_push($this->backlog, $req);
+            if ($this->should_fwd()) {
+                $this->fwd_request($this->backlog);
+                $this->backlog = array();
+            }
+            $last_fwd_check = $this->now();
+        } else {
+            $this->fwd_request($req);
+        }
     }
     
     private function to_string_by_type($o)
@@ -636,6 +705,12 @@ class Logger
         } else {
             throw new Exception("Residue not initialised. You must initialise the residue instance with configurations before you can use residue\Logger");
         }
+    }
+
+    public function flush()
+    {
+        if (!$this->is_ready) return;
+        $this->residue_instance->flush_all();
     }
 
     public function info($format, ...$values)

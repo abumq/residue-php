@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.2]
+### Updates
+- Added compression and bulk request support
+
 ## [1.0.1]
 ### Updates
 - Internal log to file (`<session_dir>/internal.log`) instead of console
