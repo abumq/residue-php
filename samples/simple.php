@@ -45,4 +45,12 @@ $logger->info("test %s %s", 1, 2);
 // verbose log
 $logger->verbose(9, "this is msg %d ---", 123);
 
+// you can manually flush in case something is pending in bulk request
+// or leave it for library to take care of it
+$logger->flush();
+
+for ($i = 1; $i <= 100; ++$i) {
+    $logger->info("This is request %d", $i);
+}
+
 echo "last msg\n";

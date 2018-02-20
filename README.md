@@ -19,8 +19,6 @@ Please check out [sample configuration](/samples/client.conf.json) to find out m
 This library does not currently support following features:
 
  * Unknown clients
- * Bulk requests
- * Compression (will require when bulk requests is done)
  * Plain log request
  * Custom key size
 
