@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.3]
+### Updates
+- Added support for immediate close
+
 ## [1.0.2]
 ### Updates
 - Added compression and bulk request support
