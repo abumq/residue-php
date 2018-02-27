@@ -10,7 +10,7 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 1.0.2
+// Version: 1.0.3
 //
 
 namespace residue;
@@ -618,7 +618,8 @@ class Residue
             "level" => $level,
             "file" => $debug_trace[2]["file"],
             "line" => $debug_trace[2]["line"],            
-            "func" => count($debug_trace) > 3 ? $debug_trace[3]["function"] : ""
+            "func" => count($debug_trace) > 3 ? $debug_trace[3]["function"] : "",
+            "_close" => true,
         );
         if ($this->config->time_offset > 0) {
             $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);
