@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.0.0]
+### Updates
+- Compatibility with residue server 2.0.0
+
 ## [1.0.3]
 ### Updates
 - Added support for immediate close

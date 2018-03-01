@@ -10,7 +10,7 @@
 // https://muflihun.github.io/residue
 // https://github.com/muflihun/residue-php
 //
-// Version: 1.0.3
+// Version: 2.0.0
 //
 
 namespace residue;
@@ -30,8 +30,6 @@ abstract class Flag
 {
     const NONE = 0;
     const ALLOW_UNKNOWN_LOGGERS = 1;
-    const REQUIRES_TOKEN = 2;
-    const ALLOW_DEFAULT_ACCESS_CODE = 4;
     const ALLOW_BULK_LOG_REQUEST = 16;
     const COMPRESSION = 256; 
 }
@@ -135,7 +133,6 @@ class Residue
         $this->config->public_key_file = $this->config->session_dir . "/rsa.pub.pem";
         $this->config->connection_file = $this->config->session_dir . "/conn";
         $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
-        $this->config->tokens_dir = $this->config->session_dir . "/tokens/";
         $this->config->connection_lock_file = $this->config->session_dir . "/conn.lock";
         $this->config->internal_log_file = $this->config->session_dir . "/internal.log";
         
@@ -170,28 +167,16 @@ class Residue
                 $this->internal_log_info("Resetting connection");
                 unlink($this->config->connection_file);
                 unlink($this->config->connection_mtime_file);
-                $this->delete_all_tokens();
             } else {
                 $diff = $this->config->reset_conn - $age;
                 $this->internal_log_info("Connection reset in {$diff}s (Age: {$age}s)");
             }
         }
 
-        if (!file_exists($this->config->tokens_dir)) {
-            if (!mkdir($this->config->tokens_dir , 0777, true)) {
-                $this->internal_log_err("Failed to create directory [{$this->config->tokens_dir}]");
-                return false;
-            }
-        } else if (!is_writable($this->config->tokens_dir)) {
-            $this->internal_log_err("[{$this->config->tokens_dir}] is not writable");
-            return false;
-        }
-
         $this->update_connection();
         if (!$this->validate_connection()) {
             $this->connect();
         } else {
-            $this->tokens = array();
             $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
         }
         $this->internal_log_info($this->connected === true ? "Successfully connected" : "Failed to connect");
@@ -265,11 +250,6 @@ class Residue
         return "{$this->config->nc_bin} {$this->config->host} {$this->config->port}";
     }
 
-    private function build_nc_token()
-    {
-        return "{$this->config->nc_bin} {$this->config->host} {$this->connection->token_port}";
-    }
-
     private function build_nc_logging()
     {
         return "{$this->config->nc_bin} {$this->config->host} {$this->connection->logging_port}";
@@ -278,11 +258,6 @@ class Residue
     private function build_ripe_nc()
     {
         return "{$this->build_ripe()} | {$this->build_nc()}";
-    }
-
-    private function build_ripe_nc_token()
-    {
-        return "{$this->build_ripe()} | {$this->build_nc_token()}";
     }
 
     private function build_ripe_nc_logging($compress = false)
@@ -308,7 +283,6 @@ class Residue
     {
         $this->connected = false;
         $this->connection = null;
-        $this->tokens = array();
     }
 
     private function create_empty_file($file)
@@ -382,19 +356,9 @@ class Residue
 
         $this->update_connection();
 
-        $this->delete_all_tokens();
-
         // verify
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
         $this->unlock();
-    }
-
-    private function delete_all_tokens()
-    {
-        $this->internal_log_trace("delete_all_tokens()");
-        if (file_exists($this->config->tokens_dir)) {
-            array_map('unlink', glob("{$this->config->tokens_dir}/*"));
-        }
     }
 
     private function touch()
@@ -424,7 +388,6 @@ class Residue
         $this->create_empty_file($this->config->connection_file);
         file_put_contents($this->config->connection_file, $decrypted_result, LOCK_EX);
         $this->update_connection();
-        $this->delete_all_tokens();
 
         $this->connected = $this->connection->status === 0 && $this->connection->ack === 1;
         $this->unlock();
@@ -454,73 +417,6 @@ class Residue
         return time();
     }
 
-    private function validate_token($token)
-    {
-        $this->internal_log_trace("validate_token()");
-        if (!$this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
-            $this->internal_log_info("no token required");
-            return true;
-        }
-        return $token !== null && ($token->life === 0 || $this->now() - $token->date_created < $token->life);
-    }
-
-    private function obtain_token($logger_id, $access_code)
-    {
-        $this->lock();
-        $this->internal_log_trace("obtain_token()");
-        $req = array(
-            "_t" => $this->now(),
-            "logger_id" => $logger_id,
-            "access_code" => $access_code
-        );
-        $request = $this->build_req($req);
-        $result = shell_exec("echo '$request' | {$this->build_ripe_nc_token()}");
-        $decrypted_result = $this->decrypt($result);
-        $decoded = json_decode($decrypted_result);
-        if ($decoded !== null && !empty($decoded->error_text)) {
-            $this->internal_log_err("{$decoded->error_text}, status: {$decoded->status}");
-            $this->unlock();
-            return false;
-        } else if ($decoded === null) {
-            $this->internal_log_err("Decoding response failed {$result}");
-            $this->unlock();
-            return false;
-        }
-        $decoded->date_created = $this->now();
-        $final = json_encode($decoded);
-        $token_file = $this->config->tokens_dir . $logger_id;
-        $this->create_empty_file($token_file);
-        file_put_contents($token_file, $final, LOCK_EX);
-        $this->update_token($logger_id);
-        $this->unlock();
-    }
-
-    private function update_token($logger_id)
-    {
-        $this->internal_log_trace("update_token()");
-        $this->tokens[$logger_id] = null;
-        $token_file = $this->config->tokens_dir . $logger_id;
-        if (file_exists($token_file) && filesize($token_file) > 0) {
-            $token_info = json_decode(file_get_contents($this->config->tokens_dir . $logger_id));
-            $this->tokens[$logger_id] = json_decode(json_encode(array(
-                "token" => $token_info->token, 
-                "life" => $token_info->life, 
-                "date_created" => $token_info->date_created
-            )));
-        }
-    }
-
-    private function read_access_code($logger_id)
-    {
-        $this->internal_log_trace("read_access_code()");
-        foreach ($this->config->access_codes as &$ac) {
-            if ($ac->logger_id === $logger_id) {
-                return $ac->code;
-            }
-        }
-        return null;
-    }
-    
     public function build_thread_id()
     {
         if (isset($_SERVER)) {
@@ -549,23 +445,6 @@ class Residue
         return count($this->backlog) >= $this->connection->max_bulk_size;
     }
 
-    private function validate_or_obtainToken($logger_id)
-    {
-        // this function assumes REQUIRES_TOKEN flag is ON
-        if (array_key_exists($logger_id, $this->tokens)) {
-            if (!$this->validate_token($this->tokens[$logger_id])) {
-                $this->internal_log_info("token expired (memory)");
-                $this->obtain_token($logger_id, $this->read_access_code($logger_id));
-            }
-        } else {
-            $this->update_token($logger_id);
-            if (!$this->validate_token($this->tokens[$logger_id])) {
-                $this->internal_log_info("token expired");
-                $this->obtain_token($logger_id, $this->read_access_code($logger_id));
-            }
-        }
-    }
-
     private function fwd_request($req, $is_from_backlog)
     {
         if (!$this->validate_connection()) {
@@ -576,20 +455,6 @@ class Residue
         if ($this->should_touch()) {
             $this->internal_log_info("connection should be touched");
             $this->touch();
-        }
-        if ($this->has_flag(\residue\Flag::REQUIRES_TOKEN)) {
-            if ($is_from_backlog) {
-                $this->last_fwd_check = $this->now();
-                foreach ($req as &$r) {
-                    // note: requests have logger instead of logger_id
-                    $this->validate_or_obtainToken($r["logger"]);
-                    $r["token"] = $this->tokens[$r["logger"]]->token;
-                }
-            } else {
-                $this->validate_or_obtainToken($req["logger"]);
-                $req["token"] = $this->tokens[$req["logger"]]->token;
-            }
-            
         }
         $request = $this->build_req($req);
 
@@ -619,7 +484,6 @@ class Residue
             "file" => $debug_trace[2]["file"],
             "line" => $debug_trace[2]["line"],            
             "func" => count($debug_trace) > 3 ? $debug_trace[3]["function"] : "",
-            "_close" => true,
         );
         if ($this->config->time_offset > 0) {
             $req["datetime"] = $req["datetime"] + (1000 * $this->config->time_offset);

@@ -6,7 +6,7 @@
 
 A very simple, secure PHP library to interact with residue seamlessly.
 
-This library provides interface for connecting and interacting with residue server seamlessly, means, once you are connected this module takes care of expired tokens and clients and keep itself updated with latest tokens and ping server when needed to stay alive.
+This library provides interface for connecting and interacting with residue server seamlessly, means, once you are connected this module takes care of expired clients and keep itself updated with latest parameters and ping server when needed to stay alive.
 
 ## Dependencies
 This library currently depends on following binaries
@@ -28,7 +28,6 @@ This library does not currently support following features:
 | **Config** | **Type** | **Description** |
 |------------|----------|-----------------|
 | `url`      | String   | Combination of URI and port of residue server |
-| `access_codes`      | Object   | Array of access codes |
 | `application_id`      | String   | Application ID for `%app` format specifier |
 | `rsa_key_size`      | Number   | RSA key size (generated randomly) for unknown clients |
 | `time_offset`      | Number   | Log time offset (in seconds) |
@@ -38,7 +37,7 @@ This library does not currently support following features:
 | `server_public_key`      | String   | Full path to server public key (if any) |
 | `ripe_bin`      | String   | Command to successfully run [ripe](https://github.com/muflihun/ripe) binary using user that will run your PHP script<br><br>Problems occur if the user running the script cannot run `ripe` or `nc` binaries. You may also be interested in following issues on stackexchange network<br>* [how to set crontab PATH variable](https://unix.stackexchange.com/questions/148133/how-to-set-crontab-path-variable)<br>* [How to get CRON to call in the correct PATHs](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-in-the-correct-paths)<br>* [How to set cron PATH globally (i.e. for all users) permanently?](https://superuser.com/questions/164394/how-to-set-cron-path-globally-i-e-for-all-users-permanently) |
 | `nc_bin`      | String   | Command to successfully run [nc](https://linux.die.net/man/1/nc) binary using user that will run your PHP script |
-| `session_dir`      | String   | Full path to an empty directory for storing temporary objects by library (e.g, connection params, tokens etc). This directory must not contain anything and it may be cleared at times by this library. |
+| `session_dir`      | String   | Full path to an empty directory for storing temporary objects by library (e.g, connection params etc). This directory must not contain anything and it may be cleared at times by this library. |
 | `reset_conn`      | Number   | Forcefully resets the connection after this time (in seconds) |
 | `internal_log_file_limit` | Number | Maximum limit (in KB) for internal logging file (stored in `<session_dir>/internal.log`). Defaults to 2048 KB |
 
@@ -46,12 +45,6 @@ This library does not currently support following features:
 ```
 {
     "url": "localhost:8777",
-    "access_codes": [
-        {
-            "logger_id": "...",
-            "code": "..."
-        }
-    ],
     "application_id": "com.muflihun.residue.php.sampleapp",
     "rsa_key_size": 2048,
     "time_offset": 0,
