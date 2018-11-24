@@ -5,7 +5,10 @@ A very simple, secure PHP library to interact with residue seamlessly.
 
 This library provides interface for connecting and interacting with residue server seamlessly, means, once you are connected this module takes care of expired clients and keep itself updated with latest parameters and ping server when needed to stay alive.
 
-[![Version](https://img.shields.io/github/release/muflihun/residue-php.svg)](https://github.com/muflihun/residue-php/releases/latest) [![GitHub license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/muflihun/residue-php/blob/master/LICENCE) [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/MuflihunDotCom/25)
+[![Version](https://img.shields.io/github/release/zuhd-org/residue-php.svg)](https://github.com/zuhd-org/residue-php/releases/latest) [![GitHub license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/zuhd-org/residue-php/blob/master/LICENCE)
+
+[![Donate](https://muflihun.github.io/donate.png?v2)](https://www.paypal.me/zuhd/25)
+
 
 ## Dependencies
 This library currently depends on following binaries
@@ -34,7 +37,7 @@ This library does not currently support following features:
 | `client_private_key`      | String   | Full path of RSA private key |
 | `client_key_secret`      | String   | Secret (passphrase) for encrypted private key (if any) |
 | `server_public_key`      | String   | Full path to server public key (if any) |
-| `ripe_bin`      | String   | Command to successfully run [ripe](https://github.com/muflihun/ripe) binary using user that will run your PHP script<br><br>Problems occur if the user running the script cannot run `ripe` or `nc` binaries. You may also be interested in following issues on stackexchange network<br>* [how to set crontab PATH variable](https://unix.stackexchange.com/questions/148133/how-to-set-crontab-path-variable)<br>* [How to get CRON to call in the correct PATHs](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-in-the-correct-paths)<br>* [How to set cron PATH globally (i.e. for all users) permanently?](https://superuser.com/questions/164394/how-to-set-cron-path-globally-i-e-for-all-users-permanently) |
+| `ripe_bin`      | String   | Command to successfully run [ripe](https://github.com/zuhd-org/ripe) binary using user that will run your PHP script<br><br>Problems occur if the user running the script cannot run `ripe` or `nc` binaries. You may also be interested in following issues on stackexchange network<br>* [how to set crontab PATH variable](https://unix.stackexchange.com/questions/148133/how-to-set-crontab-path-variable)<br>* [How to get CRON to call in the correct PATHs](https://stackoverflow.com/questions/2388087/how-to-get-cron-to-call-in-the-correct-paths)<br>* [How to set cron PATH globally (i.e. for all users) permanently?](https://superuser.com/questions/164394/how-to-set-cron-path-globally-i-e-for-all-users-permanently) |
 | `nc_bin`      | String   | Command to successfully run [nc](https://linux.die.net/man/1/nc) binary using user that will run your PHP script |
 | `session_dir`      | String   | Full path to an empty directory for storing temporary objects by library (e.g, connection params etc). This directory must not contain anything and it may be cleared at times by this library. |
 | `reset_conn`      | Number   | Forcefully resets the connection after this time (in seconds) |
@@ -44,7 +47,7 @@ This library does not currently support following features:
 ```
 {
     "url": "localhost:8777",
-    "application_id": "com.muflihun.residue.php.sampleapp",
+    "application_id": "org.zuhd.residue.php.sampleapp",
     "rsa_key_size": 2048,
     "time_offset": 0,
     "client_id": "muflihun00102030",
@@ -90,11 +93,12 @@ $logger->verbose(9, "this is msg %d ---", 123);
 
 ## License
 ```
-Copyright 2017-present Muflihun Labs
+Copyright 2017-present Zuhd Web Services
 Copyright 2017-present @abumusamq
 
-https://github.com/muflihun/
+https://github.com/zuhd-org/
 https://muflihun.com
+https://zuhd.org
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -2,13 +2,13 @@
 //
 // Official PHP client library for Residue logging server
 //
-// Copyright 2017-present Muflihun Labs
+// Copyright 2017-present Zuhd Web Services
 //
 // Author: @abumusamq
 //
 // https://muflihun.com
-// https://muflihun.github.io/residue
-// https://github.com/muflihun/residue-php
+// https://zuhd.org
+// https://github.com/zuhd-org/residue-php
 //
 // Version: 2.0.0
 //
@@ -31,13 +31,13 @@ abstract class Flag
     const NONE = 0;
     const ALLOW_UNKNOWN_LOGGERS = 1;
     const ALLOW_BULK_LOG_REQUEST = 16;
-    const COMPRESSION = 256; 
+    const COMPRESSION = 256;
 }
 
-class Residue 
+class Residue
 {
     const TOUCH_THRESHOLD = 60;
-    
+
     private $config_file = null;
     private $backlog = array();
     private $last_fwd_check = null;
@@ -79,7 +79,7 @@ class Residue
 
     ////////////////////////////// internal logging ////////////////////////////////////
     private static $internal_log_verbose_level = 2;
-    
+
     public function internal_log_verbose($msg, $level)
     {
         if ($this->config != null && property_exists($this->config, "internal_log_file") && is_writable($this->config->internal_log_file)) {
@@ -108,7 +108,7 @@ class Residue
     {
         $this->internal_log_verbose("info:  " . $this->to_string_by_type($msg), 8);
     }
-    
+
     ////////////////////////////// end - internal logging ////////////////////////////////////
 
     private function init_connection($config_file)
@@ -135,7 +135,7 @@ class Residue
         $this->config->connection_mtime_file = $this->config->session_dir . "/conn.mtime";
         $this->config->connection_lock_file = $this->config->session_dir . "/conn.lock";
         $this->config->internal_log_file = $this->config->session_dir . "/internal.log";
-        
+
         if (!property_exists($this->config, "internal_log_file_limit")) {
             $this->config->internal_log_file_limit = 2048 * 1024;
         } else {
@@ -143,13 +143,13 @@ class Residue
         }
 
         $this->internal_log_info("init by " . get_current_user());
-        
-        if (file_exists($this->config->internal_log_file) 
+
+        if (file_exists($this->config->internal_log_file)
                 && filesize($this->config->internal_log_file) > $this->config->internal_log_file_limit) {
             unlink($this->config->internal_log_file);
         }
         $this->create_empty_file($this->config->internal_log_file);
-        
+
         $sleepingFor = 0;
         while ($this->locked()) {
             sleep(1);
@@ -336,7 +336,7 @@ class Residue
         file_put_contents($this->config->connection_file, $this->decrypt($result, 2), LOCK_EX);
         file_put_contents($this->config->connection_mtime_file, $this->now(), LOCK_EX);
         $this->update_connection();
-        
+
         // acknowledge
         $req = array(
             "_t" => $this->now(),
@@ -482,7 +482,7 @@ class Residue
             "app" => $this->config->application_id,
             "level" => $level,
             "file" => $debug_trace[2]["file"],
-            "line" => $debug_trace[2]["line"],            
+            "line" => $debug_trace[2]["line"],
             "func" => count($debug_trace) > 3 ? $debug_trace[3]["function"] : "",
         );
         if ($this->config->time_offset > 0) {
@@ -506,7 +506,7 @@ class Residue
             $this->fwd_request($req, false);
         }
     }
-    
+
     private function to_string_by_type($o)
     {
         switch (gettype($o)) {
