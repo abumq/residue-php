@@ -1,6 +1,7 @@
 ﷽
 
 # Residue PHP Client
+
 A very simple, secure PHP library to interact with residue seamlessly.
 
 This library provides interface for connecting and interacting with residue server seamlessly, means, once you are connected this module takes care of expired clients and keep itself updated with latest parameters and ping server when needed to stay alive.
@@ -8,7 +9,6 @@ This library provides interface for connecting and interacting with residue serv
 [![Version](https://img.shields.io/github/release/zuhd-org/residue-php.svg)](https://github.com/zuhd-org/residue-php/releases/latest) [![GitHub license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/zuhd-org/residue-php/blob/master/LICENCE)
 
 [![Donate](https://muflihun.github.io/donate.png?v2)](https://www.paypal.me/zuhd/25)
-
 
 ## Dependencies
 This library currently depends on following binaries
