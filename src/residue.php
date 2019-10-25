@@ -2,13 +2,13 @@
 //
 // Official PHP client library for Residue logging server
 //
-// Copyright 2017-present Zuhd Web Services
+// Copyright 2017-present Amrayn Web Services
 //
 // Author: @abumusamq
 //
 // https://muflihun.com
-// https://zuhd.org
-// https://github.com/zuhd-org/residue-php
+// https://amrayn.com
+// https://github.com/amrayn/residue-php
 //
 // Version: 2.0.0
 //

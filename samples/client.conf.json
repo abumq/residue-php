@@ -1,6 +1,6 @@
 {
     "url": "residue-server:8777",
-    "application_id": "org.zuhd.residue.sampleapp",
+    "application_id": "com.amrayn.residue.sampleapp",
     "rsa_key_size": 2048,
     "time_offset": 0,
     "client_id": "muflihun00102030",
